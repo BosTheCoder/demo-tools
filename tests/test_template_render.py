@@ -56,3 +56,10 @@ def test_stateful_stack_includes_volume_mount():
     fly_toml = (out / "fly.toml").read_text()
     assert "[mounts]" in fly_toml
     assert 'destination = "/data"' in fly_toml
+
+
+def test_compose_yml_exposes_internal_port():
+    out = _render("nextjs", internal_port=3000)
+    compose = (out / "compose.yml").read_text()
+    assert '"3000:3000"' in compose
+    assert "build: ." in compose

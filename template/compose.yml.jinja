@@ -1,0 +1,33 @@
+{%- if stack == "nextjs-fastapi" %}
+services:
+  web:
+    build: ./web
+    ports:
+      - "3000:3000"
+    environment:
+      API_URL: http://api:8000
+    depends_on:
+      - api
+  api:
+    build: ./api
+    ports:
+      - "8000:8000"
+    volumes:
+      - api_data:/data
+
+volumes:
+  api_data:
+{%- else %}
+services:
+  app:
+    build: .
+    ports:
+      - "{{ internal_port }}:{{ internal_port }}"
+{% if stateful %}    volumes:
+      - app_data:/data
+{% endif %}
+{% if stateful %}
+volumes:
+  app_data:
+{% endif %}
+{%- endif %}
