@@ -19,8 +19,52 @@ def _run_scaffold(stack: str, name: str) -> None:
     typer.echo(f"Next: cd {name} && just dev   (or 'just deploy' to ship)")
 
 
+_ADOPT_DEFAULTS = {
+    # stack -> (stateful, internal_port)
+    "bare": (False, 3000),
+    "nextjs": (False, 3000),
+    "static": (False, 80),
+    "fastapi": (True, 8000),
+    "streamlit": (True, 8501),
+    "nextjs-fastapi": (True, 3000),
+}
+
+
 def _run_adopt() -> None:
-    raise NotImplementedError("adopt is implemented in Task 5.2")
+    from pathlib import Path
+    from .adopt import detect_stack, overlay_infra
+
+    repo = Path.cwd()
+    if not (repo / "Dockerfile").exists():
+        typer.echo("Error: no Dockerfile in current directory.", err=True)
+        typer.echo("`demo-init adopt` is for existing dockerized repos.", err=True)
+        typer.echo("To scaffold a new demo: demo-init <stack> <name>", err=True)
+        raise typer.Exit(1)
+
+    detected = detect_stack(repo)
+    if detected:
+        ans = typer.prompt(
+            f"Detected stack: {detected}. Confirm? [Y/n]",
+            default="Y",
+            show_default=False,
+        ).strip().lower()
+        stack = detected if ans in {"", "y", "yes"} else _prompt_stack()
+    else:
+        typer.echo("Could not detect stack from package.json / requirements.txt.")
+        stack = _prompt_stack()
+
+    name = repo.name
+    stateful, port = _ADOPT_DEFAULTS[stack]
+    overlay_infra(repo, name=name, stack=stack, stateful=stateful, internal_port=port)
+    typer.echo(f"Adopted {name}: infra files added (existing files preserved).")
+    typer.echo("Next: review fly.toml, then `just deploy`.")
+
+
+def _prompt_stack() -> str:
+    return typer.prompt(
+        f"Which stack? ({'|'.join(VALID_STACKS)})",
+        default="nextjs",
+    ).strip()
 
 
 class _InitGroup(TyperGroup):

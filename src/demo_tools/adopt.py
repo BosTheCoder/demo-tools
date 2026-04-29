@@ -3,6 +3,11 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import yaml
+from copier import run_copy
+
+from .scaffold import DEFAULT_DOMAIN, TEMPLATE_DIR
+
 
 def detect_stack(repo: Path) -> str | None:
     """Best-effort stack detection. Returns None if ambiguous."""
@@ -34,3 +39,54 @@ def detect_stack(repo: Path) -> str | None:
             return "fastapi"
 
     return None
+
+
+def overlay_infra(
+    repo: Path,
+    *,
+    name: str,
+    stack: str,
+    stateful: bool,
+    internal_port: int,
+) -> None:
+    """Apply the Copier infra overlay onto an existing dockerized repo.
+
+    Skips files that already exist (existing Dockerfile, package.json, app code,
+    etc. are preserved). Only adds the missing infra layer: justfile, fly.toml,
+    infra/fly/*.sh, .demo-template-version, etc.
+    """
+    if not (repo / "Dockerfile").exists():
+        raise FileNotFoundError(
+            f"No Dockerfile found in {repo}. "
+            "`adopt` is for existing dockerized repos. "
+            "Use `demo-init <stack> <name>` to scaffold a new demo."
+        )
+
+    run_copy(
+        src_path=str(TEMPLATE_DIR),
+        dst_path=str(repo),
+        data={
+            "name": name,
+            "stack": stack,
+            "stateful": stateful,
+            "internal_port": internal_port,
+            "domain_base": DEFAULT_DOMAIN,
+        },
+        defaults=True,
+        unsafe=True,
+        quiet=True,
+        overwrite=True,
+        skip_if_exists=["**"],
+    )
+
+    answers_path = repo / ".demo-template-version"
+    if not answers_path.exists():
+        answers_path.write_text(yaml.safe_dump({
+            "_src_path": str(TEMPLATE_DIR),
+            "_commit": "HEAD",
+            "name": name,
+            "stack": stack,
+            "stateful": stateful,
+            "internal_port": internal_port,
+            "domain_base": DEFAULT_DOMAIN,
+        }))
