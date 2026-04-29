@@ -18,10 +18,11 @@ _REAL_RUN = subprocess.run
 
 
 def _is_npm_or_npx(cmd) -> bool:
+    """Match calls whose program name is npm or npx (with or without a path prefix)."""
     if not cmd or not isinstance(cmd, (list, tuple)):
         return False
-    first = str(cmd[0]) if cmd else ""
-    return "npx" in first or first == "npm" or any("npx" in str(c) for c in cmd)
+    first = str(cmd[0])
+    return first in {"npm", "npx"} or first.endswith("/npm") or first.endswith("/npx")
 
 
 @pytest.mark.parametrize("stack", ["bare", "fastapi", "streamlit"])
