@@ -8,7 +8,15 @@ VALID_STACKS = ("nextjs", "nextjs-fastapi", "fastapi", "streamlit", "static", "b
 
 
 def _run_scaffold(stack: str, name: str) -> None:
-    raise NotImplementedError("scaffold is implemented in Task 4.2")
+    from pathlib import Path
+    from .scaffold import scaffold_demo
+    target = Path.cwd() / name
+    if target.exists():
+        typer.echo(f"Error: {target} already exists.", err=True)
+        raise typer.Exit(1)
+    scaffold_demo(stack, name, target)
+    typer.echo(f"Scaffolded {name} at {target}")
+    typer.echo(f"Next: cd {name} && just dev   (or 'just deploy' to ship)")
 
 
 def _run_adopt() -> None:

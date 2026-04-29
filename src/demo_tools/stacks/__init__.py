@@ -10,15 +10,16 @@ class StackScaffolder(Protocol):
 
 def get_scaffolder(stack: str) -> StackScaffolder:
     """Return the scaffolder module for the given stack name."""
-    from . import bare, fastapi, nextjs, nextjs_fastapi, static, streamlit
-    table = {
-        "bare": bare,
-        "nextjs": nextjs,
-        "static": static,
-        "fastapi": fastapi,
-        "streamlit": streamlit,
-        "nextjs-fastapi": nextjs_fastapi,
+    import importlib
+
+    module_names = {
+        "bare": "bare",
+        "nextjs": "nextjs",
+        "static": "static",
+        "fastapi": "fastapi",
+        "streamlit": "streamlit",
+        "nextjs-fastapi": "nextjs_fastapi",
     }
-    if stack not in table:
+    if stack not in module_names:
         raise ValueError(f"Unknown stack: {stack}")
-    return table[stack]
+    return importlib.import_module(f".{module_names[stack]}", package=__name__)
