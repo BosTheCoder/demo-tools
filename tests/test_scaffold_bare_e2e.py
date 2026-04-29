@@ -1,7 +1,4 @@
-import os
 import subprocess
-import tempfile
-from pathlib import Path
 
 from demo_tools.scaffold import scaffold_demo
 

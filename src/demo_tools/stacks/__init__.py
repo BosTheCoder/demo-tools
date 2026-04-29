@@ -1,25 +1,32 @@
 from __future__ import annotations
 
+import importlib
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, Protocol, cast
 
 
 class StackScaffolder(Protocol):
     def scaffold(self, target: Path, name: str) -> dict[str, Any]: ...
 
 
-def get_scaffolder(stack: str) -> StackScaffolder:
-    """Return the scaffolder module for the given stack name."""
-    import importlib
+_MODULE_NAMES = {
+    "bare": "bare",
+    "nextjs": "nextjs",
+    "static": "static",
+    "fastapi": "fastapi",
+    "streamlit": "streamlit",
+    "nextjs-fastapi": "nextjs_fastapi",
+}
 
-    module_names = {
-        "bare": "bare",
-        "nextjs": "nextjs",
-        "static": "static",
-        "fastapi": "fastapi",
-        "streamlit": "streamlit",
-        "nextjs-fastapi": "nextjs_fastapi",
-    }
-    if stack not in module_names:
+
+def get_scaffolder(stack: str) -> StackScaffolder:
+    """Return the scaffolder module for the given stack name.
+
+    Lazily imports the requested stack module so missing siblings don't fail
+    package-level imports during incremental development (Phase 4 builds these
+    modules one at a time).
+    """
+    if stack not in _MODULE_NAMES:
         raise ValueError(f"Unknown stack: {stack}")
-    return importlib.import_module(f".{module_names[stack]}", package=__name__)
+    module = importlib.import_module(f".{_MODULE_NAMES[stack]}", package=__name__)
+    return cast("StackScaffolder", module)
