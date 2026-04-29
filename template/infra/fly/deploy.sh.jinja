@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+# MANAGED BY demo-tools — DO NOT EDIT. Run `just sync` to update.
+set -euo pipefail
+
+APP="{{ name }}"
+HOST="{{ name }}.{{ domain_base }}"
+
+{% if stack == "nextjs-fastapi" -%}
+APP_WEB="${APP}-web"
+APP_API="${APP}-api"
+
+echo "==> Deploying API ($APP_API)"
+( cd api && fly deploy --app "$APP_API" --remote-only )
+
+echo "==> Deploying WEB ($APP_WEB)"
+( cd web && fly deploy --app "$APP_WEB" --remote-only )
+
+echo "==> Ensuring TLS cert for $HOST -> $APP_WEB"
+ensure_cert() {
+    local target_app="$1"
+    for attempt in 1 2 3; do
+        if fly certs add --app "$target_app" "$HOST" 2>&1; then
+            return 0
+        fi
+        echo "cert add attempt $attempt failed, sleeping 30s..."
+        sleep 30
+    done
+    echo "ERROR: failed to provision cert for $HOST after 3 attempts."
+    echo "Verify Namecheap DNS records:"
+    echo "  *.demos    A     <Fly IPv4>"
+    echo "  *.demos    AAAA  <Fly IPv6>"
+    return 1
+}
+ensure_cert "$APP_WEB"
+
+echo
+echo "Deployed:"
+echo "  https://${APP_WEB}.fly.dev"
+echo "  https://${HOST}"
+{%- else -%}
+echo "==> Deploying $APP"
+fly deploy --app "$APP" --remote-only
+
+echo "==> Ensuring TLS cert for $HOST"
+for attempt in 1 2 3; do
+    if fly certs add --app "$APP" "$HOST" 2>&1; then
+        break
+    fi
+    if [[ "$attempt" -eq 3 ]]; then
+        echo "ERROR: failed to provision cert for $HOST after 3 attempts."
+        echo "Verify Namecheap DNS records:"
+        echo "  *.demos    A     <Fly IPv4>"
+        echo "  *.demos    AAAA  <Fly IPv6>"
+        exit 1
+    fi
+    echo "cert add attempt $attempt failed, sleeping 30s..."
+    sleep 30
+done
+
+echo
+echo "Deployed:"
+echo "  https://${APP}.fly.dev"
+echo "  https://${HOST}"
+{%- endif %}

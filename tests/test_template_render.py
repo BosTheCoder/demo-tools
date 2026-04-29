@@ -86,3 +86,12 @@ def test_copier_yml_does_not_leak_into_rendered_demo():
     out = _render("bare", internal_port=3000)
     assert not (out / "copier.yml").exists()
     assert not (out / "copier.yaml").exists()
+
+
+def test_deploy_sh_renders_with_app_name():
+    out = _render("nextjs", internal_port=3000)
+    deploy = (out / "infra" / "fly" / "deploy.sh").read_text()
+    assert "tmp-demo" in deploy
+    assert "fly deploy" in deploy
+    assert "fly certs add" in deploy
+    assert "tmp-demo.demos.buildwithbos.com" in deploy
