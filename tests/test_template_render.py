@@ -71,3 +71,11 @@ def test_justfile_has_all_verbs():
     for verb in ["dev:", "build:", "deploy:", "stop:", "start:",
                  "destroy:", "logs:", "ssh:", "status:", "open:", "sync:"]:
         assert verb in just, f"missing verb: {verb}"
+
+
+def test_readme_contains_demo_name_and_urls():
+    out = _render("nextjs", internal_port=3000)
+    readme = (out / "README.md").read_text()
+    assert "tmp-demo" in readme
+    assert "tmp-demo.fly.dev" in readme
+    assert "tmp-demo.demos.buildwithbos.com" in readme
