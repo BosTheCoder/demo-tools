@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# MANAGED BY demo-tools — DO NOT EDIT. Run `just sync` to update.
+set -euo pipefail
+HOST="{{ name }}.{{ domain_base }}"
+URL="https://${HOST}"
+if command -v xdg-open >/dev/null 2>&1; then
+    xdg-open "$URL"
+elif command -v open >/dev/null 2>&1; then
+    open "$URL"
+else
+    echo "$URL"
+fi

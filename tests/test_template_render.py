@@ -95,3 +95,20 @@ def test_deploy_sh_renders_with_app_name():
     assert "fly deploy" in deploy
     assert "fly certs add" in deploy
     assert "tmp-demo.demos.buildwithbos.com" in deploy
+
+
+def test_all_infra_scripts_render():
+    out = _render("nextjs", internal_port=3000)
+    fly_dir = out / "infra" / "fly"
+    for script in ["stop.sh", "start.sh", "destroy.sh", "logs.sh",
+                   "ssh.sh", "status.sh", "open.sh"]:
+        path = fly_dir / script
+        assert path.exists(), f"missing {script}"
+        if script != "open.sh":
+            assert "tmp-demo" in path.read_text()
+
+
+def test_destroy_sh_has_confirmation_prompt():
+    out = _render("nextjs", internal_port=3000)
+    destroy = (out / "infra" / "fly" / "destroy.sh").read_text()
+    assert "[y/N]" in destroy

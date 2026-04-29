@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# MANAGED BY demo-tools — DO NOT EDIT. Run `just sync` to update.
+set -euo pipefail
+APP="{{ name }}"
+{% if stack == "nextjs-fastapi" -%}
+fly machines stop --app "${APP}-web" || true
+fly machines stop --app "${APP}-api" || true
+{%- else -%}
+fly machines stop --app "$APP" || true
+{%- endif %}
+echo "Stopped. Billing on this app is now ~\$0 until 'just start'."
