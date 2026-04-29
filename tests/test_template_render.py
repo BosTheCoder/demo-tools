@@ -33,8 +33,14 @@ def test_bare_renders_dockerfile():
     assert "TODO" in content  # bare stack ships with a placeholder
 
 
-@pytest.mark.parametrize("stack", ["bare", "nextjs", "static", "fastapi", "streamlit", "nextjs-fastapi"])
+@pytest.mark.parametrize("stack", ["bare", "nextjs", "static", "fastapi", "streamlit"])
 def test_all_stacks_render_dockerfile(stack):
+    """Single-app stacks render a top-level Dockerfile.
+
+    nextjs-fastapi is excluded because its real Dockerfiles live in web/ and api/
+    (written by the scaffolder); the top-level placeholder is removed by the
+    Copier _tasks post-process step. See test_nextjs_fastapi_skips_top_level_*.
+    """
     out = _render(stack)
     dockerfile = out / "Dockerfile"
     assert dockerfile.exists()
@@ -128,3 +134,15 @@ def test_db_create_sh_only_works_for_stateful_stacks():
     fastapi_db = (fastapi_out / "infra" / "fly" / "db-create.sh").read_text()
     assert "not applicable for stack 'nextjs'" in nextjs_db
     assert "fly postgres create" in fastapi_db
+
+
+def test_nextjs_fastapi_skips_top_level_dockerfile_and_fly_toml():
+    """For nextjs-fastapi, real Dockerfile/fly.toml live in web/ and api/.
+    The top-level placeholders rendered by the template must be removed by
+    Copier's _tasks post-process step."""
+    out = _render("nextjs-fastapi", internal_port=3000)
+    assert not (out / "Dockerfile").exists(), "top-level Dockerfile should be removed"
+    assert not (out / "fly.toml").exists(), "top-level fly.toml should be removed"
+    assert not (out / "compose.yml").exists(), "top-level compose.yml should be removed"
+    # Infra scripts should still be there.
+    assert (out / "infra" / "fly" / "deploy.sh").exists()
