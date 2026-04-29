@@ -1,0 +1,55 @@
+set shell := ["bash", "-cu"]
+
+PLATFORM := env_var_or_default("DEMO_PLATFORM", "fly")
+
+# Local development with hot reload
+dev:
+    docker compose up
+
+# Build the Docker image locally to sanity-check
+build:
+    docker compose build
+
+# Deploy to the configured platform
+deploy:
+    bash infra/{{PLATFORM}}/deploy.sh
+
+# Stop all machines (billing -> ~$0)
+stop:
+    bash infra/{{PLATFORM}}/stop.sh
+
+# Start machines after a stop
+start:
+    bash infra/{{PLATFORM}}/start.sh
+
+# Destroy the deployed app (with confirmation)
+destroy:
+    bash infra/{{PLATFORM}}/destroy.sh
+
+# Tail platform logs
+logs:
+    bash infra/{{PLATFORM}}/logs.sh
+
+# SSH into a running machine
+ssh:
+    bash infra/{{PLATFORM}}/ssh.sh
+
+# Show platform status and public URLs
+status:
+    bash infra/{{PLATFORM}}/status.sh
+
+# Open the demo URL in a browser
+open:
+    bash infra/{{PLATFORM}}/open.sh
+
+# Pull latest infra improvements from the demo-tools template
+sync:
+    uvx copier update --trust
+
+# Set a Fly secret: just secret KEY=VAL
+secret KV:
+    bash infra/{{PLATFORM}}/secret.sh "{{KV}}"
+
+# Provision a managed Postgres (stateful stacks only)
+db-create:
+    bash infra/{{PLATFORM}}/db-create.sh

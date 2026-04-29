@@ -63,3 +63,11 @@ def test_compose_yml_exposes_internal_port():
     compose = (out / "compose.yml").read_text()
     assert '"3000:3000"' in compose
     assert "build: ." in compose
+
+
+def test_justfile_has_all_verbs():
+    out = _render("bare", internal_port=3000)
+    just = (out / "justfile").read_text()
+    for verb in ["dev:", "build:", "deploy:", "stop:", "start:",
+                 "destroy:", "logs:", "ssh:", "status:", "open:", "sync:"]:
+        assert verb in just, f"missing verb: {verb}"
