@@ -6,7 +6,12 @@ from pathlib import Path
 import yaml
 from copier import run_copy
 
-from ._resources import DEFAULT_DOMAIN, TEMPLATE_DIR
+from ._resources import (
+    DEFAULT_DOMAIN,
+    TEMPLATE_DIR,
+    TEMPLATE_GIT_URL,
+    TEMPLATE_SUBDIR,
+)
 from .stacks import get_scaffolder
 
 
@@ -33,11 +38,17 @@ def scaffold_demo(stack: str, name: str, target: Path) -> None:
         overwrite=True,
     )
 
+    # Write the Copier answers file with the GitHub URL form so `just sync`
+    # (which runs `copier update`) can fetch the latest template from a real
+    # VCS source. Copier rejects bare local paths for update operations.
+    # This requires the demo-tools repo to be published (Task 7.5); pre-publish,
+    # `just sync` will fail with a clone error — that's acceptable for v0.1.
     answers_path = target / ".demo-template-version"
     if not answers_path.exists():
         answers_path.write_text(yaml.safe_dump({
-            "_src_path": str(TEMPLATE_DIR),
-            "_commit": "HEAD",
+            "_src_path": TEMPLATE_GIT_URL,
+            "_subdirectory": TEMPLATE_SUBDIR,
+            "_commit": "main",
             "name": name,
             "stack": stack,
             "stateful": meta["stateful"],
