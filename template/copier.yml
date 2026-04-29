@@ -33,7 +33,16 @@ domain_base:
   help: "Subdomain base (results in <name>.<domain_base>)"
   default: "demos.buildwithbos.com"
 
-# Skip files we list here (used during `adopt` mode)
+# Files Copier should not copy into rendered demos.
+# IMPORTANT: this list REPLACES Copier's built-in default exclude list (it does
+# not extend it), so we must include the defaults too — otherwise copier.yml
+# itself leaks into every rendered demo.
 _exclude:
+  - "copier.yml"
+  - "copier.yaml"
+  - "~*"
   - "*.py[cod]"
   - "__pycache__"
+  - ".git"
+  - ".DS_Store"
+  - ".svn"

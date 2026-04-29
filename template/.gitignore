@@ -6,6 +6,6 @@ __pycache__/
 *.py[cod]
 .venv/
 .env
-.env.local
+.env*
 *.db
 .DS_Store

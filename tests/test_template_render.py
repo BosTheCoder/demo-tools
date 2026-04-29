@@ -79,3 +79,10 @@ def test_readme_contains_demo_name_and_urls():
     assert "tmp-demo" in readme
     assert "tmp-demo.fly.dev" in readme
     assert "tmp-demo.demos.buildwithbos.com" in readme
+
+
+def test_copier_yml_does_not_leak_into_rendered_demo():
+    """Regression: _exclude must include copier.yml or it ships in every demo."""
+    out = _render("bare", internal_port=3000)
+    assert not (out / "copier.yml").exists()
+    assert not (out / "copier.yaml").exists()

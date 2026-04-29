@@ -6,7 +6,7 @@ Demo deployed via [demo-tools](https://github.com/BosTheCoder/demo-tools).
 - **Local dev:** `just dev`
 - **Deploy:** `just deploy`
 - **Live URLs:**
-  - https://{{ name }}.fly.dev
-  - https://{{ name }}.{{ domain_base }}
+  - https://{{ name }}.fly.dev (always works)
+  - https://{{ name }}.{{ domain_base }} (requires `*.{{ domain_base }}` wildcard DNS pointing at Fly)
 - **Stop / start / destroy:** `just stop` / `just start` / `just destroy`
 - **Update infra files:** `just sync`
