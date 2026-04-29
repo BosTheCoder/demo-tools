@@ -1,0 +1,66 @@
+{%- if stack == "bare" %}
+# TODO: replace this placeholder with a real Dockerfile for your stack.
+# Container must listen on port {{ internal_port }} on 0.0.0.0.
+FROM alpine:3.20
+RUN echo "Bare stack — replace this Dockerfile" && exit 1
+{%- elif stack == "nextjs" %}
+FROM node:20-bookworm-slim AS deps
+WORKDIR /app
+COPY app/package.json app/package-lock.json* ./
+RUN npm ci
+
+FROM node:20-bookworm-slim AS builder
+WORKDIR /app
+COPY app/ ./
+COPY --from=deps /app/node_modules ./node_modules
+RUN npm run build
+
+FROM node:20-bookworm-slim AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+ENV PORT={{ internal_port }}
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
+COPY --from=builder /app/public ./public
+EXPOSE {{ internal_port }}
+CMD ["node", "server.js"]
+{%- elif stack == "static" %}
+FROM node:20-bookworm-slim AS builder
+WORKDIR /app
+COPY app/package.json app/package-lock.json* ./
+RUN npm ci
+COPY app/ ./
+RUN npm run build
+
+FROM nginx:1.27-alpine AS runner
+COPY --from=builder /app/dist /usr/share/nginx/html
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
+{%- elif stack == "fastapi" %}
+FROM python:3.12-slim
+WORKDIR /app
+ENV PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1
+RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
+COPY app/requirements.txt ./
+RUN pip install -r requirements.txt
+COPY app/ ./
+RUN mkdir -p /data
+EXPOSE {{ internal_port }}
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "{{ internal_port }}"]
+{%- elif stack == "streamlit" %}
+FROM python:3.12-slim
+WORKDIR /app
+ENV PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1
+COPY app/requirements.txt ./
+RUN pip install -r requirements.txt
+COPY app/ ./
+RUN mkdir -p /data
+EXPOSE {{ internal_port }}
+CMD ["streamlit", "run", "streamlit_app.py", "--server.port={{ internal_port }}", "--server.address=0.0.0.0", "--server.headless=true"]
+{%- elif stack == "nextjs-fastapi" %}
+# nextjs-fastapi uses two Dockerfiles, one per service (web/, api/).
+# This top-level Dockerfile is a placeholder; the per-service Dockerfiles
+# are written by the scaffolder into web/Dockerfile and api/Dockerfile.
+FROM alpine:3.20
+RUN echo "nextjs-fastapi: build web/ and api/ separately" && exit 1
+{%- endif %}
