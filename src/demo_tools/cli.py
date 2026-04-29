@@ -1,8 +1,39 @@
 from __future__ import annotations
 
+import click
 import typer
+from typer.core import TyperGroup
+
+VALID_STACKS = ("nextjs", "nextjs-fastapi", "fastapi", "streamlit", "static", "bare")
+
+
+def _run_scaffold(stack: str, name: str) -> None:
+    raise NotImplementedError("scaffold is implemented in Task 4.2")
+
+
+def _run_adopt() -> None:
+    raise NotImplementedError("adopt is implemented in Task 5.2")
+
+
+class _InitGroup(TyperGroup):
+    """Routes bare ``demo-init <stack> <name>`` to the ``scaffold`` subcommand.
+
+    Click resolves the subcommand before any callback runs, so we can't use a
+    Typer callback + ``ctx.args`` to peek at unparsed positional args (the
+    group's ``parse_args`` would have already failed). Instead we rewrite the
+    arg list at ``resolve_command`` time when the first arg is a known stack.
+    """
+
+    def resolve_command(
+        self, ctx: click.Context, args: list[str]
+    ) -> tuple[str | None, click.Command | None, list[str]]:
+        if args and args[0] in VALID_STACKS:
+            args = ["scaffold", *args]
+        return super().resolve_command(ctx, args)
+
 
 init_app = typer.Typer(
+    cls=_InitGroup,
     no_args_is_help=True,
     help="Scaffold a new demo or adopt an existing dockerized repo.",
 )
@@ -11,28 +42,26 @@ demo_app = typer.Typer(
     help="Manage existing demos (list, prune).",
 )
 
-VALID_STACKS = ("nextjs", "nextjs-fastapi", "fastapi", "streamlit", "static", "bare")
-
 
 @init_app.command("scaffold")
 def scaffold(stack: str = typer.Argument(...), name: str = typer.Argument(...)) -> None:
-    """Scaffold a new demo: demo-init scaffold <stack> <name>."""
-    raise NotImplementedError
+    """Explicit form: demo-init scaffold <stack> <name>."""
+    _run_scaffold(stack, name)
 
 
 @init_app.command("adopt")
 def adopt() -> None:
     """Overlay infra onto an existing dockerized repo in the current directory."""
-    raise NotImplementedError
+    _run_adopt()
 
 
 @demo_app.command("list")
 def list_demos() -> None:
     """List all Fly apps with status and URLs."""
-    raise NotImplementedError
+    raise NotImplementedError("demo list is implemented in Task 6.1")
 
 
 @demo_app.command("prune")
 def prune(older_than: str = typer.Option("14d", "--older-than")) -> None:
     """Interactively destroy demos older than the given age."""
-    raise NotImplementedError
+    raise NotImplementedError("demo prune is implemented in Task 6.2")
