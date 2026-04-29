@@ -44,7 +44,7 @@ open:
 
 # Pull latest infra improvements from the demo-tools template
 sync:
-    uvx copier update --trust
+    uvx copier update --answers-file .demo-template-version --trust
 
 # Set a Fly secret: just secret KEY=VAL
 secret KV:
