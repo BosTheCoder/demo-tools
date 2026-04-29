@@ -110,10 +110,68 @@ def adopt() -> None:
 @demo_app.command("list")
 def list_demos() -> None:
     """List all Fly apps with status and URLs."""
-    raise NotImplementedError("demo list is implemented in Task 6.1")
+    from rich.console import Console
+    from rich.table import Table
+
+    from .fleet import DOMAIN_BASE, list_apps, list_demos_only
+
+    apps = list_demos_only(list_apps())
+    table = Table(title="Demos")
+    table.add_column("name")
+    table.add_column("status")
+    table.add_column("url")
+    for a in apps:
+        url = f"https://{a['name']}.{DOMAIN_BASE}"
+        table.add_row(a["name"], a["status"], url)
+    Console().print(table)
 
 
 @demo_app.command("prune")
-def prune(older_than: str = typer.Option("14d", "--older-than")) -> None:
+def prune(
+    older_than: str = typer.Option("14d", "--older-than"),
+    yes: bool = typer.Option(False, "--yes", "-y"),
+) -> None:
     """Interactively destroy demos older than the given age."""
-    raise NotImplementedError("demo prune is implemented in Task 6.2")
+    import datetime as dt
+    import json
+    import subprocess as sp
+
+    from .fleet import list_apps, list_demos_only, parse_duration
+
+    cutoff = dt.datetime.now(dt.timezone.utc) - parse_duration(older_than)
+
+    candidates = []
+    for app in list_demos_only(list_apps()):
+        try:
+            r = sp.run(
+                ["fly", "status", "--app", app["name"], "--json"],
+                capture_output=True, text=True, check=True,
+            )
+            status = json.loads(r.stdout)
+            created = status.get("App", {}).get("CreatedAt")
+            if not created:
+                continue
+            created_dt = dt.datetime.fromisoformat(created.replace("Z", "+00:00"))
+            if created_dt < cutoff:
+                candidates.append((app["name"], created_dt, app.get("kind")))
+        except sp.CalledProcessError:
+            continue
+
+    if not candidates:
+        typer.echo(f"No demos older than {older_than}.")
+        return
+
+    typer.echo(f"Candidates older than {older_than}:")
+    for name, created, _kind in candidates:
+        typer.echo(f"  {name}  (created {created:%Y-%m-%d})")
+
+    for name, _created, kind in candidates:
+        if not yes:
+            ans = typer.prompt(f"Destroy {name}? [y/N]", default="N", show_default=False)
+            if ans.strip().lower() not in {"y", "yes"}:
+                typer.echo(f"  skipped {name}")
+                continue
+        targets = [name] if kind != "nextjs-fastapi" else [f"{name}-web", f"{name}-api"]
+        for t in targets:
+            sp.run(["fly", "apps", "destroy", "--yes", t], check=False)
+        typer.echo(f"  destroyed {name}")
