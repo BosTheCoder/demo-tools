@@ -6,8 +6,7 @@ from pathlib import Path
 import pytest
 from copier import run_copy
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
-TEMPLATE = REPO_ROOT / "template"
+from demo_tools._resources import TEMPLATE_DIR as TEMPLATE
 
 
 def _render(stack: str, **overrides) -> Path:

@@ -6,11 +6,8 @@ from pathlib import Path
 import yaml
 from copier import run_copy
 
+from ._resources import DEFAULT_DOMAIN, TEMPLATE_DIR
 from .stacks import get_scaffolder
-
-REPO_ROOT = Path(__file__).resolve().parents[2]
-TEMPLATE_DIR = REPO_ROOT / "template"
-DEFAULT_DOMAIN = "demos.buildwithbos.com"
 
 
 def scaffold_demo(stack: str, name: str, target: Path) -> None:

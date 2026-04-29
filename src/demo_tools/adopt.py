@@ -6,7 +6,7 @@ from pathlib import Path
 import yaml
 from copier import run_copy
 
-from .scaffold import DEFAULT_DOMAIN, TEMPLATE_DIR
+from ._resources import DEFAULT_DOMAIN, TEMPLATE_DIR
 
 
 def detect_stack(repo: Path) -> str | None:

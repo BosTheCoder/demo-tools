@@ -25,9 +25,13 @@ packages = ["src/demo_tools"]
 [tool.hatch.build]
 include = [
     "src/demo_tools/**",
-    "template/**",
-    "starters/**",
 ]
+
+# Bundle the Copier template and shipped starters as package data so the
+# installed wheel contains them at runtime (resolved via _resources.py).
+[tool.hatch.build.targets.wheel.force-include]
+"src/demo_tools/_data/template" = "demo_tools/_data/template"
+"src/demo_tools/_data/starters" = "demo_tools/_data/starters"
 
 [dependency-groups]
 dev = [
