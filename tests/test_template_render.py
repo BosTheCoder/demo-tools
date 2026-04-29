@@ -3,6 +3,7 @@ from __future__ import annotations
 import tempfile
 from pathlib import Path
 
+import pytest
 from copier import run_copy
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -30,3 +31,11 @@ def test_bare_renders_dockerfile():
     assert dockerfile.exists()
     content = dockerfile.read_text()
     assert "TODO" in content  # bare stack ships with a placeholder
+
+
+@pytest.mark.parametrize("stack", ["bare", "nextjs", "static", "fastapi", "streamlit", "nextjs-fastapi"])
+def test_all_stacks_render_dockerfile(stack):
+    out = _render(stack)
+    dockerfile = out / "Dockerfile"
+    assert dockerfile.exists()
+    assert dockerfile.read_text().strip() != ""
