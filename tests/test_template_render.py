@@ -112,3 +112,19 @@ def test_destroy_sh_has_confirmation_prompt():
     out = _render("nextjs", internal_port=3000)
     destroy = (out / "infra" / "fly" / "destroy.sh").read_text()
     assert "[y/N]" in destroy
+
+
+def test_secret_sh_takes_kv_arg():
+    out = _render("nextjs", internal_port=3000)
+    secret = (out / "infra" / "fly" / "secret.sh").read_text()
+    assert "fly secrets set" in secret
+    assert "${1" in secret  # accepts $1 with default substitution
+
+
+def test_db_create_sh_only_works_for_stateful_stacks():
+    nextjs_out = _render("nextjs")
+    fastapi_out = _render("fastapi", internal_port=8000)
+    nextjs_db = (nextjs_out / "infra" / "fly" / "db-create.sh").read_text()
+    fastapi_db = (fastapi_out / "infra" / "fly" / "db-create.sh").read_text()
+    assert "not applicable for stack 'nextjs'" in nextjs_db
+    assert "fly postgres create" in fastapi_db

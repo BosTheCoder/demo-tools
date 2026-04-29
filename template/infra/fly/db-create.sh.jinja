@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# MANAGED BY demo-tools — DO NOT EDIT. Run `just sync` to update.
+set -euo pipefail
+{% if stateful -%}
+APP="{{ name }}"
+DB_NAME="${APP}-db"
+echo "==> Creating Fly Postgres cluster: $DB_NAME"
+fly postgres create --name "$DB_NAME" --region lhr --vm-size shared-cpu-1x --volume-size 1 --initial-cluster-size 1
+{% if stack == "nextjs-fastapi" -%}
+fly postgres attach --app "${APP}-api" "$DB_NAME"
+{%- else -%}
+fly postgres attach --app "$APP" "$DB_NAME"
+{%- endif %}
+echo
+echo "Postgres provisioned. DATABASE_URL has been added to the app's secrets."
+{%- else -%}
+echo "db-create is not applicable for stack '{{ stack }}' (no DB by default)." >&2
+echo "Edit the Dockerfile and infra/fly/db-create.sh if you want to add one." >&2
+exit 1
+{%- endif %}
