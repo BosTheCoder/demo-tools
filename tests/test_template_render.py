@@ -39,3 +39,20 @@ def test_all_stacks_render_dockerfile(stack):
     dockerfile = out / "Dockerfile"
     assert dockerfile.exists()
     assert dockerfile.read_text().strip() != ""
+
+
+def test_bare_renders_fly_toml_with_correct_port():
+    out = _render("bare", internal_port=3000)
+    fly_toml = out / "fly.toml"
+    assert fly_toml.exists()
+    content = fly_toml.read_text()
+    assert 'app = "tmp-demo"' in content
+    assert "internal_port = 3000" in content
+    assert "auto_stop_machines" in content
+
+
+def test_stateful_stack_includes_volume_mount():
+    out = _render("fastapi", internal_port=8000)
+    fly_toml = (out / "fly.toml").read_text()
+    assert "[mounts]" in fly_toml
+    assert 'destination = "/data"' in fly_toml
