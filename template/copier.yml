@@ -1,0 +1,39 @@
+_min_copier_version: "9.4.0"
+_subdirectory: "."
+_answers_file: ".demo-template-version"
+
+# These are answered programmatically by the CLI; users never see prompts.
+name:
+  type: str
+  help: "Demo / Fly app name (kebab-case)"
+
+stack:
+  type: str
+  help: "Which stack: nextjs | nextjs-fastapi | fastapi | streamlit | static | bare"
+  choices:
+    - nextjs
+    - nextjs-fastapi
+    - fastapi
+    - streamlit
+    - static
+    - bare
+
+stateful:
+  type: bool
+  help: "Does this stack need SQLite + a Fly volume?"
+  default: false
+
+internal_port:
+  type: int
+  help: "Port the container exposes (3000 for nextjs, 8000 for fastapi, etc.)"
+  default: 3000
+
+domain_base:
+  type: str
+  help: "Subdomain base (results in <name>.<domain_base>)"
+  default: "demos.buildwithbos.com"
+
+# Skip files we list here (used during `adopt` mode)
+_exclude:
+  - "*.py[cod]"
+  - "__pycache__"
