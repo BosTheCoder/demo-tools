@@ -1,0 +1,18 @@
+app = "__APP_WEB__"
+primary_region = "lhr"
+
+[build]
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+[env]
+  API_URL = "http://__APP_API__.internal:8000"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"
