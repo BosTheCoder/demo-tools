@@ -84,10 +84,28 @@ class _InitGroup(TyperGroup):
         return super().resolve_command(ctx, args)
 
 
+_INIT_HELP = """Scaffold a new demo or adopt an existing dockerized repo.
+
+Stacks (positional shorthand: demo-init <stack> <name>):
+
+  nextjs          Next.js + Tailwind, single Fly app
+  nextjs-fastapi  Next.js web + FastAPI api, dual Fly app (api on .internal)
+  fastapi         FastAPI starter, SQLite + Fly volume
+  streamlit       Streamlit starter, SQLite + Fly volume
+  static          Vite + nginx static site
+  bare            Empty app/, bring your own Dockerfile
+
+Examples:
+
+  demo-init static my-site
+  demo-init nextjs my-app
+  demo-init adopt
+"""
+
 init_app = typer.Typer(
     cls=_InitGroup,
     no_args_is_help=True,
-    help="Scaffold a new demo or adopt an existing dockerized repo.",
+    help=_INIT_HELP,
 )
 demo_app = typer.Typer(
     no_args_is_help=True,
