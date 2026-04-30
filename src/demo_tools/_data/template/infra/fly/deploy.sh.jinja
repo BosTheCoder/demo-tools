@@ -5,9 +5,21 @@ set -euo pipefail
 APP="{{ name }}"
 HOST="{{ name }}.{{ domain_base }}"
 
+# Idempotent: fly deploy does not auto-create the app on first run.
+ensure_app() {
+    local app="$1"
+    if ! fly status --app "$app" >/dev/null 2>&1; then
+        echo "==> Creating Fly app $app"
+        fly apps create "$app" --org personal
+    fi
+}
+
 {% if stack == "nextjs-fastapi" -%}
 APP_WEB="${APP}-web"
 APP_API="${APP}-api"
+
+ensure_app "$APP_API"
+ensure_app "$APP_WEB"
 
 echo "==> Deploying API ($APP_API)"
 ( cd api && fly deploy --app "$APP_API" --remote-only )
@@ -38,6 +50,8 @@ echo "Deployed:"
 echo "  https://${APP_WEB}.fly.dev"
 echo "  https://${HOST}"
 {%- else -%}
+ensure_app "$APP"
+
 echo "==> Deploying $APP"
 fly deploy --app "$APP" --remote-only
 
