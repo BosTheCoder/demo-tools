@@ -11,9 +11,13 @@ def scaffold(target: Path, name: str) -> dict[str, Any]:
 
     cmd = [
         "npm", "create", "vite@latest", "--yes",
-        str(app_dir), "--", "--template", "react-ts",
+        app_dir.name, "--", "--template", "react-ts",
     ]
-    subprocess.run(cmd, check=True)
+    # cwd=parent + relative path: create-vite v8 strips the leading slash from
+    # absolute paths and joins onto cwd, so passing an absolute path scaffolds
+    # into <cwd>/<abs-path-without-slash>. stdin=DEVNULL also suppresses the
+    # "Install with npm and start now?" prompt that would otherwise hang.
+    subprocess.run(cmd, check=True, cwd=app_dir.parent, stdin=subprocess.DEVNULL)
     subprocess.run(["npm", "install"], cwd=app_dir, check=True)
 
     return {"stack": "static", "stateful": False, "internal_port": 80}

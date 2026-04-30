@@ -15,8 +15,10 @@ def test_nextjs_scaffold_invokes_create_next_app(tmp_path):
         assert "--app" in cmd
         assert "--tailwind" in cmd
         assert "--src-dir" in cmd
-        # Output dir is target/app
-        assert str(tmp_path / "app") in cmd
+        # Output dir is "app" relative to cwd=tmp_path (avoids upstream
+        # mishandling of absolute paths).
+        assert "app" in cmd
+        assert run.call_args.kwargs["cwd"] == tmp_path
     assert meta["internal_port"] == 3000
     assert meta["stateful"] is False
 

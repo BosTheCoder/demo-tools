@@ -21,11 +21,13 @@ def scaffold(target: Path, name: str) -> dict[str, Any]:
     # WEB: scaffold via create-next-app, then overlay Dockerfile + fly.toml.
     cmd = [
         "npx", "--yes", "create-next-app@latest",
-        str(web_dir),
+        web_dir.name,
         "--ts", "--app", "--tailwind", "--src-dir",
         "--use-npm", "--no-eslint", "--no-import-alias",
     ]
-    subprocess.run(cmd, check=True)
+    # Relative path + cwd=parent (avoids upstream absolute-path mishandling);
+    # stdin=DEVNULL keeps the run non-interactive.
+    subprocess.run(cmd, check=True, cwd=web_dir.parent, stdin=subprocess.DEVNULL)
 
     # When subprocess is mocked (in tests), web_dir won't be created. Make sure
     # it exists before writing into it. In production, create-next-app creates

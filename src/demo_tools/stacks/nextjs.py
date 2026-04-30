@@ -11,11 +11,13 @@ def scaffold(target: Path, name: str) -> dict[str, Any]:
 
     cmd = [
         "npx", "--yes", "create-next-app@latest",
-        str(app_dir),
+        app_dir.name,
         "--ts", "--app", "--tailwind", "--src-dir",
         "--use-npm", "--no-eslint", "--no-import-alias",
     ]
-    subprocess.run(cmd, check=True)
+    # Relative path + cwd=parent (some upstream scaffolders mishandle absolute
+    # paths). stdin=DEVNULL keeps the run non-interactive.
+    subprocess.run(cmd, check=True, cwd=app_dir.parent, stdin=subprocess.DEVNULL)
 
     # Patch next.config to enable standalone output (required by our Dockerfile).
     cfg = app_dir / "next.config.mjs"
