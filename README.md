@@ -154,11 +154,28 @@ Each Fly app gets its own dedicated IPs, so a single wildcard `*.demos` record c
 
 1. Add your domain to a Cloudflare account (free plan is fine) and switch nameservers at your registrar to Cloudflare's pair.
 2. Create an API token at [dash.cloudflare.com/profile/api-tokens](https://dash.cloudflare.com/profile/api-tokens) with permission **Zone → DNS → Edit** scoped to the specific zone.
-3. Export the token in your shell:
+3. Make the token available at deploy time. Two recommended paths:
+
+   **A. Bitwarden Secrets Manager (recommended for multi-machine).** Store the token in BWS, set `BWS_ACCESS_TOKEN` in your shell, and `just deploy` auto-wraps with `bws run` so the token is fetched and injected only at deploy time:
    ```bash
-   export CLOUDFLARE_API_TOKEN="your-token-here"
+   # one-time, in BWS web UI:
+   #   create org → enable Secrets Manager → create project "demo-tools"
+   #   create machine account scoped to that project
+   #   create access token, copy the value (starts with "0.")
+   #   add a secret: key=CLOUDFLARE_API_TOKEN, value=<your CF token>
+
+   # in ~/.zshrc:
+   export BWS_ACCESS_TOKEN="<bws access token>"
+
+   # then any demo:
+   just deploy   # bws run -- ... wraps automatically
    ```
-   (Persist by adding it to `~/.zshrc` / `~/.bashrc`.)
+
+   **B. Plain env var (simpler, single machine).** `chmod 600 ~/.zshrc` then:
+   ```bash
+   export CLOUDFLARE_API_TOKEN="<cf token>"
+   ```
+
 4. From here, `just deploy` upserts the right records on every deploy. Tear-downs leave the records in place — destroyed apps free up their hostnames automatically when DNS resolves to nothing.
 
 **Manual fallback.** If you skip the Cloudflare step, the deploy still succeeds — the cert just enters "awaiting_configuration" until you add A/AAAA records pointing `<name>.demos.<domain>` at the IPs from `fly ips list -a <name>`.

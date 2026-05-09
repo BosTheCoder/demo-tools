@@ -10,9 +10,16 @@ dev:
 build:
     docker compose build
 
-# Deploy to the configured platform
+# Deploy to the configured platform.
+# Auto-wraps with `bws run` if Bitwarden Secrets Manager is configured
+# (BWS_ACCESS_TOKEN set + bws on PATH), so secrets like CLOUDFLARE_API_TOKEN
+# are injected from your BWS project at deploy time.
 deploy:
-    bash infra/{{PLATFORM}}/deploy.sh
+    @if [ -n "${BWS_ACCESS_TOKEN:-}" ] && command -v bws >/dev/null 2>&1; then \
+        bws run -- bash infra/{{PLATFORM}}/deploy.sh; \
+    else \
+        bash infra/{{PLATFORM}}/deploy.sh; \
+    fi
 
 # Stop all machines (billing -> ~$0)
 stop:
