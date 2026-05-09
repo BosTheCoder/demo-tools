@@ -20,8 +20,11 @@ def scaffold(target: Path, name: str) -> dict[str, Any]:
     subprocess.run(cmd, check=True, cwd=app_dir.parent, stdin=subprocess.DEVNULL)
 
     # Patch next.config to enable standalone output (required by our Dockerfile).
-    cfg = app_dir / "next.config.mjs"
-    cfg.write_text(
+    # create-next-app v16+ emits next.config.ts; older versions emit .mjs/.js.
+    # Remove any variant the upstream wrote so our single .mjs is authoritative.
+    for ext in ("ts", "js", "mjs"):
+        (app_dir / f"next.config.{ext}").unlink(missing_ok=True)
+    (app_dir / "next.config.mjs").write_text(
         "/** @type {import('next').NextConfig} */\n"
         "const nextConfig = { output: 'standalone' };\n"
         "export default nextConfig;\n"

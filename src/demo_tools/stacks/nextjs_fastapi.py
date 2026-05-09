@@ -34,7 +34,10 @@ def scaffold(target: Path, name: str) -> dict[str, Any]:
     # web_dir; this mkdir(exist_ok=True) is a no-op then.
     web_dir.mkdir(parents=True, exist_ok=True)
 
-    # Patch next.config for standalone output.
+    # Patch next.config for standalone output. Drop any upstream variant first
+    # (create-next-app v16+ emits .ts; we want a single .mjs).
+    for ext in ("ts", "js", "mjs"):
+        (web_dir / f"next.config.{ext}").unlink(missing_ok=True)
     (web_dir / "next.config.mjs").write_text(
         "/** @type {import('next').NextConfig} */\n"
         "const nextConfig = { output: 'standalone' };\n"
