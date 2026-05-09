@@ -42,8 +42,9 @@ else
     echo "$ZONE_ID" > "$ZONE_ID_CACHE"
 fi
 
-# Pull v4 + v6 IPs from Fly. fly's --json output schema has shifted across
-# versions; tolerate 'Address'/'IP' and 'Family'/'Version' field names.
+# Pull v4 + v6 IPs from Fly. flyctl's --json shape uses a "Type" field with
+# values like "v6", "shared_v4", "dedicated_v4". Match on suffix to be
+# robust against shared/dedicated and any future variant.
 FLY_IPS_JSON=$(fly ips list -a "$APP" --json)
 
 extract_ip() {
@@ -52,9 +53,9 @@ extract_ip() {
 import sys, json
 fam = '$family'
 for ip in json.load(sys.stdin):
-    f = (ip.get('Family') or ip.get('Version') or '').lower()
-    if f == fam or (fam == 'v4' and f == '4') or (fam == 'v6' and f == '6'):
-        print(ip.get('Address') or ip.get('IP') or '')
+    t = (ip.get('Type') or '').lower()
+    if t.endswith(fam):
+        print(ip.get('Address') or '')
         break
 "
 }
