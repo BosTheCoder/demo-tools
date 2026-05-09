@@ -136,12 +136,15 @@ def test_db_create_sh_only_works_for_stateful_stacks():
 
 
 def test_nextjs_fastapi_skips_top_level_dockerfile_and_fly_toml():
-    """For nextjs-fastapi, real Dockerfile/fly.toml live in web/ and api/.
-    The top-level placeholders rendered by the template must be removed by
-    Copier's _tasks post-process step."""
+    """For nextjs-fastapi, real Dockerfile/fly.toml live in web/ and api/. The
+    top-level placeholders rendered by the template must be removed by Copier's
+    _tasks post-process step. compose.yml is KEPT — its dual-app Jinja branch
+    aggregates both services so `just build` works at the top level."""
     out = _render("nextjs-fastapi", internal_port=3000)
     assert not (out / "Dockerfile").exists(), "top-level Dockerfile should be removed"
     assert not (out / "fly.toml").exists(), "top-level fly.toml should be removed"
-    assert not (out / "compose.yml").exists(), "top-level compose.yml should be removed"
+    compose = (out / "compose.yml").read_text()
+    assert "build: ./web" in compose
+    assert "build: ./api" in compose
     # Infra scripts should still be there.
     assert (out / "infra" / "fly" / "deploy.sh").exists()

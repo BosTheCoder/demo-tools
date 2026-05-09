@@ -19,6 +19,12 @@ def scaffold(target: Path, name: str) -> dict[str, Any]:
     # paths). stdin=DEVNULL keeps the run non-interactive.
     subprocess.run(cmd, check=True, cwd=app_dir.parent, stdin=subprocess.DEVNULL)
 
+    # create-next-app v16+ runs `git init` inside the project; remove that
+    # nested .git so the outer scaffold's `git add` tracks app/ contents
+    # instead of treating it as an embedded submodule.
+    import shutil
+    shutil.rmtree(app_dir / ".git", ignore_errors=True)
+
     # Patch next.config to enable standalone output (required by our Dockerfile).
     # create-next-app v16+ emits next.config.ts; older versions emit .mjs/.js.
     # Remove any variant the upstream wrote so our single .mjs is authoritative.

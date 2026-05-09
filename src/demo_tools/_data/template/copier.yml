@@ -47,8 +47,10 @@ _exclude:
   - ".DS_Store"
   - ".svn"
 
-# Post-render cleanup. For nextjs-fastapi, the real Dockerfile/fly.toml/compose.yml
-# live in web/ and api/ (created by the scaffolder); the top-level renderings
-# are fail-fast placeholders that should be removed.
+# Post-render cleanup. For nextjs-fastapi, the real Dockerfile/fly.toml live in
+# web/ and api/ (created by the scaffolder); the top-level renderings are
+# fail-fast placeholders that should be removed. compose.yml is KEPT — its
+# dual-app branch in compose.yml.jinja wires both services for `just build`/
+# `just dev` at the top level.
 _tasks:
-  - "{% if stack == 'nextjs-fastapi' %}rm -f Dockerfile fly.toml compose.yml{% endif %}"
+  - "{% if stack == 'nextjs-fastapi' %}rm -f Dockerfile fly.toml{% endif %}"

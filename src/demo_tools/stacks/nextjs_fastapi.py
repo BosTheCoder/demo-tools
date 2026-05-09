@@ -14,9 +14,11 @@ def scaffold(target: Path, name: str) -> dict[str, Any]:
     web_dir = target / "web"
     api_dir = target / "api"
 
-    # API: copy starter as-is.
+    # API: copy starter as-is, then render fly.toml from the .template and
+    # remove the unrendered template file from the scaffold.
     shutil.copytree(STARTER / "api", api_dir)
     _render_fly_toml(api_dir, name, role="api")
+    (api_dir / "fly.toml.template").unlink(missing_ok=True)
 
     # WEB: scaffold via create-next-app, then overlay Dockerfile + fly.toml.
     cmd = [
@@ -33,6 +35,10 @@ def scaffold(target: Path, name: str) -> dict[str, Any]:
     # it exists before writing into it. In production, create-next-app creates
     # web_dir; this mkdir(exist_ok=True) is a no-op then.
     web_dir.mkdir(parents=True, exist_ok=True)
+
+    # create-next-app v16+ runs `git init` inside web/; remove the nested .git
+    # so the outer scaffold's `git add` tracks web/ contents.
+    shutil.rmtree(web_dir / ".git", ignore_errors=True)
 
     # Patch next.config for standalone output. Drop any upstream variant first
     # (create-next-app v16+ emits .ts; we want a single .mjs).
