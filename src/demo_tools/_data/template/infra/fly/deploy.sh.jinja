@@ -4,6 +4,10 @@ set -euo pipefail
 
 APP="{{ name }}"
 HOST="{{ name }}.{{ domain_base }}"
+DOMAIN_BASE="{{ domain_base }}"
+DNS_ZONE="${DOMAIN_BASE#*.}"   # demos.buildwithbos.com -> buildwithbos.com
+
+HERE="$(cd "$(dirname "$0")" && pwd)"
 
 # Idempotent: fly deploy does not auto-create the app on first run.
 ensure_app() {
@@ -27,6 +31,9 @@ echo "==> Deploying API ($APP_API)"
 echo "==> Deploying WEB ($APP_WEB)"
 ( cd web && fly deploy --app "$APP_WEB" --remote-only )
 
+# Cert lives on the web app; web's IPs need the DNS record.
+bash "$HERE/cloudflare_dns.sh" "$APP_WEB" "$HOST" "$DNS_ZONE"
+
 echo "==> Ensuring TLS cert for $HOST -> $APP_WEB"
 ensure_cert() {
     local target_app="$1"
@@ -38,9 +45,8 @@ ensure_cert() {
         sleep 30
     done
     echo "ERROR: failed to provision cert for $HOST after 3 attempts."
-    echo "Verify Namecheap DNS records:"
-    echo "  *.demos    A     <Fly IPv4>"
-    echo "  *.demos    AAAA  <Fly IPv6>"
+    echo "If you're not using Cloudflare DNS automation, add A/AAAA records"
+    echo "in your DNS provider for $HOST pointing at \`fly ips list -a $target_app\`."
     return 1
 }
 ensure_cert "$APP_WEB"
@@ -55,6 +61,8 @@ ensure_app "$APP"
 echo "==> Deploying $APP"
 fly deploy --app "$APP" --remote-only
 
+bash "$HERE/cloudflare_dns.sh" "$APP" "$HOST" "$DNS_ZONE"
+
 echo "==> Ensuring TLS cert for $HOST"
 for attempt in 1 2 3; do
     if fly certs add --app "$APP" "$HOST" 2>&1; then
@@ -62,9 +70,8 @@ for attempt in 1 2 3; do
     fi
     if [[ "$attempt" -eq 3 ]]; then
         echo "ERROR: failed to provision cert for $HOST after 3 attempts."
-        echo "Verify Namecheap DNS records:"
-        echo "  *.demos    A     <Fly IPv4>"
-        echo "  *.demos    AAAA  <Fly IPv6>"
+        echo "If you're not using Cloudflare DNS automation, add A/AAAA records"
+        echo "in your DNS provider for $HOST pointing at \`fly ips list -a $APP\`."
         exit 1
     fi
     echo "cert add attempt $attempt failed, sleeping 30s..."

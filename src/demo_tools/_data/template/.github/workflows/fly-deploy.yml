@@ -1,0 +1,38 @@
+# MANAGED BY demo-tools — DO NOT EDIT. Run `just sync` to update.
+#
+# Auto-deploys to Fly.io on every push to main.
+#
+# Setup (one-time per demo):
+#   gh secret set FLY_API_TOKEN -b "$(fly auth token)"
+#   # optional, if using Cloudflare DNS automation:
+#   gh secret set CLOUDFLARE_API_TOKEN -b "$CLOUDFLARE_API_TOKEN"
+#
+# To DISABLE auto-deploy for this demo, just delete this file:
+#   rm .github/workflows/fly-deploy.yml && git commit -am "disable auto-deploy"
+#
+# To trigger a deploy manually without a push, use the "Actions" tab on
+# GitHub → "Fly Deploy" → "Run workflow".
+
+name: Fly Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: fly-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to Fly.io
+    runs-on: ubuntu-latest
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - uses: extractions/setup-just@v3
+      - run: just deploy

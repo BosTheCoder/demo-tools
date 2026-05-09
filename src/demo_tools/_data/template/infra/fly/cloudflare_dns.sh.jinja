@@ -1,0 +1,101 @@
+#!/usr/bin/env bash
+# MANAGED BY demo-tools — DO NOT EDIT. Run `just sync` to update.
+#
+# Upsert A + AAAA records in Cloudflare so <name>.demos.<domain> points at
+# the given Fly app's IPs. Idempotent — safe on every deploy.
+#
+# Requires CLOUDFLARE_API_TOKEN (zone:dns:edit on the parent domain).
+# When the token is unset, the script no-ops with a friendly hint, so
+# deploys still work — they just need manual DNS setup at your registrar.
+
+set -euo pipefail
+
+if [[ -z "${CLOUDFLARE_API_TOKEN:-}" ]]; then
+    echo "==> Cloudflare DNS automation skipped (CLOUDFLARE_API_TOKEN not set)"
+    echo "    To enable per-app DNS automation, export a Cloudflare API token"
+    echo "    with 'Edit zone DNS' permission and re-run \`just deploy\`."
+    exit 0
+fi
+
+APP="$1"
+HOST="$2"          # e.g. mydemo.demos.buildwithbos.com
+ZONE="$3"          # e.g. buildwithbos.com
+
+CF_API="https://api.cloudflare.com/client/v4"
+AUTH=(-H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Content-Type: application/json")
+
+# Cache the zone ID across deploys (one round-trip becomes zero on re-runs).
+ZONE_ID_CACHE="${HOME}/.cache/demo-tools/cf-zone-${ZONE}.id"
+mkdir -p "$(dirname "$ZONE_ID_CACHE")"
+
+if [[ -s "$ZONE_ID_CACHE" ]]; then
+    ZONE_ID=$(cat "$ZONE_ID_CACHE")
+else
+    ZONE_ID=$(curl -fsS "${AUTH[@]}" "$CF_API/zones?name=$ZONE" \
+        | python3 -c "import sys,json; r=json.load(sys.stdin); print(r['result'][0]['id'] if r.get('result') else '')")
+    if [[ -z "$ZONE_ID" ]]; then
+        echo "ERROR: Cloudflare zone '$ZONE' not found."
+        echo "  - Confirm $ZONE is added to your Cloudflare account and active."
+        echo "  - Confirm the API token has Zone.DNS:Edit on $ZONE."
+        exit 1
+    fi
+    echo "$ZONE_ID" > "$ZONE_ID_CACHE"
+fi
+
+# Pull v4 + v6 IPs from Fly. fly's --json output schema has shifted across
+# versions; tolerate 'Address'/'IP' and 'Family'/'Version' field names.
+FLY_IPS_JSON=$(fly ips list -a "$APP" --json)
+
+extract_ip() {
+    local family="$1"  # "v4" or "v6"
+    echo "$FLY_IPS_JSON" | python3 -c "
+import sys, json
+fam = '$family'
+for ip in json.load(sys.stdin):
+    f = (ip.get('Family') or ip.get('Version') or '').lower()
+    if f == fam or (fam == 'v4' and f == '4') or (fam == 'v6' and f == '6'):
+        print(ip.get('Address') or ip.get('IP') or '')
+        break
+"
+}
+
+V4=$(extract_ip v4)
+V6=$(extract_ip v6)
+
+if [[ -z "$V4" && -z "$V6" ]]; then
+    echo "ERROR: Could not determine public IPs for app '$APP'."
+    exit 1
+fi
+
+upsert_record() {
+    local type="$1"
+    local content="$2"
+    [[ -z "$content" ]] && return 0
+
+    local existing
+    existing=$(curl -fsS "${AUTH[@]}" \
+        "$CF_API/zones/$ZONE_ID/dns_records?type=$type&name=$HOST" \
+        | python3 -c "import sys,json; r=json.load(sys.stdin); print(r['result'][0]['id'] if r.get('result') else '')")
+
+    local payload
+    payload=$(python3 -c "
+import json
+print(json.dumps({'type': '$type', 'name': '$HOST', 'content': '$content', 'ttl': 1, 'proxied': False}))
+")
+
+    if [[ -n "$existing" ]]; then
+        echo "  update $type $HOST -> $content"
+        curl -fsS -X PUT "${AUTH[@]}" \
+            "$CF_API/zones/$ZONE_ID/dns_records/$existing" \
+            -d "$payload" >/dev/null
+    else
+        echo "  create $type $HOST -> $content"
+        curl -fsS -X POST "${AUTH[@]}" \
+            "$CF_API/zones/$ZONE_ID/dns_records" \
+            -d "$payload" >/dev/null
+    fi
+}
+
+echo "==> Updating Cloudflare DNS for $HOST"
+upsert_record A "$V4"
+upsert_record AAAA "$V6"

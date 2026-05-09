@@ -146,18 +146,44 @@ DNS, TLS certificates, and `.fly.dev` URLs all cost $0. Volumes bill while they 
 
 ---
 
-## Wildcard DNS (one-time)
+## DNS automation (Cloudflare)
 
-Run this once. Every future demo automatically gets a `<name>.demos.buildwithbos.com` URL with TLS.
+Each Fly app gets its own dedicated IPs, so a single wildcard `*.demos` record can't validate certs for multiple apps. Two options for the `<name>.demos.<domain>` URLs:
 
-1. Grab Fly's shared anycast IPs from any of your apps:
+**Recommended — Cloudflare DNS API automation.** `just deploy` will create per-app A + AAAA records automatically before validating the cert.
+
+1. Add your domain to a Cloudflare account (free plan is fine) and switch nameservers at your registrar to Cloudflare's pair.
+2. Create an API token at [dash.cloudflare.com/profile/api-tokens](https://dash.cloudflare.com/profile/api-tokens) with permission **Zone → DNS → Edit** scoped to the specific zone.
+3. Export the token in your shell:
    ```bash
-   fly ips list -a <any-app>
+   export CLOUDFLARE_API_TOKEN="your-token-here"
    ```
-2. In Namecheap → **buildwithbos.com** → **Advanced DNS**, add two records:
-   - `Type=A     Host=*.demos    Value=<v4>`
-   - `Type=AAAA  Host=*.demos    Value=<v6>`
-3. Wait 5–15 minutes for propagation. `just deploy` provisions the per-host Let's Encrypt cert automatically.
+   (Persist by adding it to `~/.zshrc` / `~/.bashrc`.)
+4. From here, `just deploy` upserts the right records on every deploy. Tear-downs leave the records in place — destroyed apps free up their hostnames automatically when DNS resolves to nothing.
+
+**Manual fallback.** If you skip the Cloudflare step, the deploy still succeeds — the cert just enters "awaiting_configuration" until you add A/AAAA records pointing `<name>.demos.<domain>` at the IPs from `fly ips list -a <name>`.
+
+---
+
+## Auto-deploy on push (GitHub Actions)
+
+Every scaffold ships a `.github/workflows/fly-deploy.yml` workflow that redeploys to Fly on every push to `main`.
+
+**Per-demo setup (one-time after pushing to GitHub):**
+```bash
+gh repo create my-demo --public --source=. --push
+gh secret set FLY_API_TOKEN -b "$(fly auth token)"
+# optional, if you use the Cloudflare DNS automation:
+gh secret set CLOUDFLARE_API_TOKEN -b "$CLOUDFLARE_API_TOKEN"
+```
+
+**To disable auto-deploy** for a specific demo, delete the workflow file:
+```bash
+rm .github/workflows/fly-deploy.yml
+git commit -am "disable auto-deploy" && git push
+```
+
+The workflow runs `just deploy` under the hood, so it picks up the same `fly apps create` + `fly deploy` + Cloudflare DNS + cert-add logic as your local invocations.
 
 ---
 

@@ -148,3 +148,27 @@ def test_nextjs_fastapi_skips_top_level_dockerfile_and_fly_toml():
     assert "build: ./api" in compose
     # Infra scripts should still be there.
     assert (out / "infra" / "fly" / "deploy.sh").exists()
+
+
+@pytest.mark.parametrize("stack", ["bare", "nextjs", "static", "fastapi", "streamlit", "nextjs-fastapi"])
+def test_cloudflare_dns_helper_and_github_workflow_render(stack):
+    """Every stack ships the Cloudflare DNS helper and the GH Actions workflow."""
+    out = _render(stack, internal_port=3000)
+    cf = out / "infra" / "fly" / "cloudflare_dns.sh"
+    wf = out / ".github" / "workflows" / "fly-deploy.yml"
+    assert cf.exists(), f"missing cloudflare_dns.sh for {stack}"
+    assert wf.exists(), f"missing fly-deploy.yml for {stack}"
+    assert "CLOUDFLARE_API_TOKEN" in cf.read_text()
+    workflow = wf.read_text()
+    assert "FLY_API_TOKEN" in workflow
+    assert "just deploy" in workflow
+
+
+def test_deploy_sh_calls_cloudflare_helper():
+    """deploy.sh must invoke cloudflare_dns.sh before fly certs add so DNS is in
+    place when Let's Encrypt validates."""
+    out = _render("static", internal_port=80)
+    deploy = (out / "infra" / "fly" / "deploy.sh").read_text()
+    cf_idx = deploy.index("cloudflare_dns.sh")
+    cert_idx = deploy.index("fly certs add")
+    assert cf_idx < cert_idx, "Cloudflare DNS update must run before cert add"
