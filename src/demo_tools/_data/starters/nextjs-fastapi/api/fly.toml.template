@@ -3,10 +3,17 @@ primary_region = "lhr"
 
 [build]
 
-# Internal-only — no public http_service
+# Internal-only — no public http_service. The api app has no public IP, so
+# this services block only governs how .internal traffic routes to the
+# internal_port. The empty handlers list keeps Fly's proxy from exposing
+# port 8000 externally even if a public IP were ever attached.
 [[services]]
   internal_port = 8000
   protocol = "tcp"
+
+  [[services.ports]]
+    port = 8000
+    handlers = []
 
 [[vm]]
   size = "shared-cpu-1x"
