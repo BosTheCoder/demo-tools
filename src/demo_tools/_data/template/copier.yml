@@ -33,6 +33,14 @@ domain_base:
   help: "Subdomain base (results in <name>.<domain_base>)"
   default: "demos.buildwithbos.com"
 
+profile:
+  type: str
+  help: "demo (auto-stop, 0 min machines) | service (always-on, ≥1 machine)"
+  choices:
+    - demo
+    - service
+  default: demo
+
 # Files Copier should not copy into rendered demos.
 # IMPORTANT: this list REPLACES Copier's built-in default exclude list (it does
 # not extend it), so we must include the defaults too — otherwise copier.yml

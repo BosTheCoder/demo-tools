@@ -172,3 +172,26 @@ def test_deploy_sh_calls_cloudflare_helper():
     cf_idx = deploy.index("cloudflare_dns.sh")
     cert_idx = deploy.index("fly certs add")
     assert cf_idx < cert_idx, "Cloudflare DNS update must run before cert add"
+
+
+def test_demo_profile_default_emits_autostop():
+    """Default profile is `demo`: auto_stop=stop, min_machines=0."""
+    out = _render("bare", internal_port=3000)
+    fly_toml = (out / "fly.toml").read_text()
+    assert 'auto_stop_machines = "stop"' in fly_toml
+    assert "min_machines_running = 0" in fly_toml
+
+
+def test_service_profile_emits_alwayson():
+    """profile=service: auto_stop=off, min_machines=1."""
+    out = _render("bare", internal_port=3000, profile="service")
+    fly_toml = (out / "fly.toml").read_text()
+    assert 'auto_stop_machines = "off"' in fly_toml
+    assert "min_machines_running = 1" in fly_toml
+
+
+def test_explicit_demo_profile_matches_default():
+    """profile=demo (explicit) renders identically to default."""
+    default_out = _render("bare", internal_port=3000)
+    explicit_out = _render("bare", internal_port=3000, profile="demo")
+    assert (default_out / "fly.toml").read_text() == (explicit_out / "fly.toml").read_text()
