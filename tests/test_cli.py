@@ -22,7 +22,7 @@ def test_init_positional_shorthand_routes_to_scaffold(mocker):
     spy = mocker.patch("demo_tools.cli._run_scaffold")
     result = runner.invoke(init_app, ["nextjs", "my-demo"])
     assert result.exit_code == 0, result.stdout
-    spy.assert_called_once_with("nextjs", "my-demo")
+    spy.assert_called_once_with("nextjs", "my-demo", "demo")
 
 
 def test_init_unknown_first_arg_does_not_call_scaffold(mocker):
@@ -40,7 +40,7 @@ def test_init_adopt_subcommand_does_not_call_scaffold(mocker):
     adopt_spy = mocker.patch("demo_tools.cli._run_adopt")
     runner.invoke(init_app, ["adopt"])
     spy.assert_not_called()
-    adopt_spy.assert_called_once_with()
+    adopt_spy.assert_called_once_with("demo")
 
 
 def test_init_explicit_scaffold_form_still_works(mocker):
@@ -48,4 +48,42 @@ def test_init_explicit_scaffold_form_still_works(mocker):
     spy = mocker.patch("demo_tools.cli._run_scaffold")
     result = runner.invoke(init_app, ["scaffold", "nextjs", "my-demo"])
     assert result.exit_code == 0, result.stdout
-    spy.assert_called_once_with("nextjs", "my-demo")
+    spy.assert_called_once_with("nextjs", "my-demo", "demo")
+
+
+def test_scaffold_command_forwards_profile_default(mocker):
+    """When --profile is omitted, _run_scaffold gets profile='demo'."""
+    spy = mocker.patch("demo_tools.cli._run_scaffold")
+    result = runner.invoke(init_app, ["scaffold", "nextjs", "my-app"])
+    assert result.exit_code == 0, result.stdout
+    spy.assert_called_once_with("nextjs", "my-app", "demo")
+
+
+def test_scaffold_command_forwards_profile_service(mocker):
+    """--profile service is forwarded to _run_scaffold."""
+    spy = mocker.patch("demo_tools.cli._run_scaffold")
+    result = runner.invoke(init_app, ["scaffold", "nextjs", "my-app", "--profile", "service"])
+    assert result.exit_code == 0, result.stdout
+    spy.assert_called_once_with("nextjs", "my-app", "service")
+
+
+def test_positional_shorthand_supports_profile_flag(mocker):
+    """`demo-init nextjs my-app --profile service` (shorthand) forwards profile."""
+    spy = mocker.patch("demo_tools.cli._run_scaffold")
+    result = runner.invoke(init_app, ["nextjs", "my-app", "--profile", "service"])
+    assert result.exit_code == 0, result.stdout
+    spy.assert_called_once_with("nextjs", "my-app", "service")
+
+
+def test_adopt_command_forwards_profile_default(mocker):
+    spy = mocker.patch("demo_tools.cli._run_adopt")
+    result = runner.invoke(init_app, ["adopt"])
+    assert result.exit_code == 0, result.stdout
+    spy.assert_called_once_with("demo")
+
+
+def test_adopt_command_forwards_profile_service(mocker):
+    spy = mocker.patch("demo_tools.cli._run_adopt")
+    result = runner.invoke(init_app, ["adopt", "--profile", "service"])
+    assert result.exit_code == 0, result.stdout
+    spy.assert_called_once_with("service")

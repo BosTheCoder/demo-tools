@@ -7,14 +7,14 @@ from typer.core import TyperGroup
 VALID_STACKS = ("nextjs", "nextjs-fastapi", "fastapi", "streamlit", "static", "bare")
 
 
-def _run_scaffold(stack: str, name: str) -> None:
+def _run_scaffold(stack: str, name: str, profile: str) -> None:
     from pathlib import Path
     from .scaffold import scaffold_demo
     target = Path.cwd() / name
     if target.exists():
         typer.echo(f"Error: {target} already exists.", err=True)
         raise typer.Exit(1)
-    scaffold_demo(stack, name, target)
+    scaffold_demo(stack, name, target, profile=profile)
     typer.echo(f"Scaffolded {name} at {target}")
     typer.echo(f"Next: cd {name} && just dev   (or 'just deploy' to ship)")
 
@@ -30,7 +30,7 @@ _ADOPT_DEFAULTS = {
 }
 
 
-def _run_adopt() -> None:
+def _run_adopt(profile: str) -> None:
     from pathlib import Path
     from .adopt import detect_stack, overlay_infra
 
@@ -55,7 +55,8 @@ def _run_adopt() -> None:
 
     name = repo.name
     stateful, port = _ADOPT_DEFAULTS[stack]
-    overlay_infra(repo, name=name, stack=stack, stateful=stateful, internal_port=port)
+    overlay_infra(repo, name=name, stack=stack, stateful=stateful,
+                  internal_port=port, profile=profile)
     typer.echo(f"Adopted {name}: infra files added (existing files preserved).")
     typer.echo("Next: review fly.toml, then `just deploy`.")
 
@@ -114,15 +115,29 @@ demo_app = typer.Typer(
 
 
 @init_app.command("scaffold")
-def scaffold(stack: str = typer.Argument(...), name: str = typer.Argument(...)) -> None:
+def scaffold(
+    stack: str = typer.Argument(...),
+    name: str = typer.Argument(...),
+    profile: str = typer.Option(
+        "demo",
+        "--profile",
+        help="demo (auto-stop, 0 min machines) | service (always-on, ≥1 machine)",
+    ),
+) -> None:
     """Explicit form: demo-init scaffold <stack> <name>."""
-    _run_scaffold(stack, name)
+    _run_scaffold(stack, name, profile)
 
 
 @init_app.command("adopt")
-def adopt() -> None:
+def adopt(
+    profile: str = typer.Option(
+        "demo",
+        "--profile",
+        help="demo (auto-stop, 0 min machines) | service (always-on, ≥1 machine)",
+    ),
+) -> None:
     """Overlay infra onto an existing dockerized repo in the current directory."""
-    _run_adopt()
+    _run_adopt(profile)
 
 
 @demo_app.command("list")
