@@ -195,3 +195,41 @@ def test_explicit_demo_profile_matches_default():
     default_out = _render("bare", internal_port=3000)
     explicit_out = _render("bare", internal_port=3000, profile="demo")
     assert (default_out / "fly.toml").read_text() == (explicit_out / "fly.toml").read_text()
+
+
+def test_scaffold_demo_passes_profile_to_template(tmp_path):
+    """scaffold_demo(..., profile='service') renders service-mode fly.toml."""
+    from demo_tools.scaffold import scaffold_demo
+
+    target = tmp_path / "svc-demo"
+    scaffold_demo("bare", "svc-demo", target, profile="service")
+
+    fly_toml = (target / "fly.toml").read_text()
+    assert 'auto_stop_machines = "off"' in fly_toml
+    assert "min_machines_running = 1" in fly_toml
+
+
+def test_scaffold_demo_writes_profile_into_answers(tmp_path):
+    """The .demo-template-version answer file must include profile so copier
+    update (just sync) re-renders consistently."""
+    from demo_tools.scaffold import scaffold_demo
+
+    target = tmp_path / "svc-demo2"
+    scaffold_demo("bare", "svc-demo2", target, profile="service")
+
+    answers = (target / ".demo-template-version").read_text()
+    assert "profile: service" in answers
+
+
+def test_scaffold_demo_default_profile_is_demo(tmp_path):
+    """Omitting profile defaults to demo (backward-compat with existing callers)."""
+    from demo_tools.scaffold import scaffold_demo
+
+    target = tmp_path / "demo-default"
+    scaffold_demo("bare", "demo-default", target)  # no profile kwarg
+
+    fly_toml = (target / "fly.toml").read_text()
+    assert 'auto_stop_machines = "stop"' in fly_toml
+    assert "min_machines_running = 0" in fly_toml
+    answers = (target / ".demo-template-version").read_text()
+    assert "profile: demo" in answers

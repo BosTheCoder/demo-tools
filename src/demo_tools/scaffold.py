@@ -15,7 +15,7 @@ from ._resources import (
 from .stacks import get_scaffolder
 
 
-def scaffold_demo(stack: str, name: str, target: Path) -> None:
+def scaffold_demo(stack: str, name: str, target: Path, profile: str = "demo") -> None:
     """Scaffold app + overlay infra + git init + initial commit."""
     target.mkdir(parents=True, exist_ok=True)
 
@@ -31,6 +31,7 @@ def scaffold_demo(stack: str, name: str, target: Path) -> None:
             "stateful": meta["stateful"],
             "internal_port": meta["internal_port"],
             "domain_base": DEFAULT_DOMAIN,
+            "profile": profile,
         },
         defaults=True,
         unsafe=True,
@@ -54,6 +55,7 @@ def scaffold_demo(stack: str, name: str, target: Path) -> None:
             "stateful": meta["stateful"],
             "internal_port": meta["internal_port"],
             "domain_base": DEFAULT_DOMAIN,
+            "profile": profile,
         }))
 
     _git_init_and_commit(target)
