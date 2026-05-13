@@ -114,28 +114,25 @@ demo_app = typer.Typer(
 )
 
 
+_PROFILE_OPTION = typer.Option(
+    "demo",
+    "--profile",
+    help="demo (auto-stop, 0 min machines) | service (always-on, ≥1 machine)",
+)
+
+
 @init_app.command("scaffold")
 def scaffold(
     stack: str = typer.Argument(...),
     name: str = typer.Argument(...),
-    profile: str = typer.Option(
-        "demo",
-        "--profile",
-        help="demo (auto-stop, 0 min machines) | service (always-on, ≥1 machine)",
-    ),
+    profile: str = _PROFILE_OPTION,
 ) -> None:
     """Explicit form: demo-init scaffold <stack> <name>."""
     _run_scaffold(stack, name, profile)
 
 
 @init_app.command("adopt")
-def adopt(
-    profile: str = typer.Option(
-        "demo",
-        "--profile",
-        help="demo (auto-stop, 0 min machines) | service (always-on, ≥1 machine)",
-    ),
-) -> None:
+def adopt(profile: str = _PROFILE_OPTION) -> None:
     """Overlay infra onto an existing dockerized repo in the current directory."""
     _run_adopt(profile)
 
