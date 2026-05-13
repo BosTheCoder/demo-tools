@@ -53,6 +53,7 @@ def overlay_infra(
     stack: str,
     stateful: bool,
     internal_port: int,
+    profile: str = "demo",
 ) -> None:
     """Apply the Copier infra overlay onto an existing dockerized repo.
 
@@ -76,6 +77,7 @@ def overlay_infra(
             "stateful": stateful,
             "internal_port": internal_port,
             "domain_base": DEFAULT_DOMAIN,
+            "profile": profile,
         },
         defaults=True,
         unsafe=True,
@@ -95,4 +97,5 @@ def overlay_infra(
             "stateful": stateful,
             "internal_port": internal_port,
             "domain_base": DEFAULT_DOMAIN,
+            "profile": profile,
         }))
