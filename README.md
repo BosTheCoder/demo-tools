@@ -66,6 +66,30 @@ Run `demo-init` with no arguments to see the six stacks listed below, with examp
 
 ---
 
+## Profiles: demo vs service
+
+Every demo is scaffolded under a **profile** that bundles its Fly auto-stop economics. Pass `--profile <demo|service>` at scaffold or adopt time:
+
+| Profile   | `auto_stop_machines` | `min_machines_running` | When to use                              |
+| --------- | -------------------- | ---------------------- | ---------------------------------------- |
+| `demo`    | `"stop"`             | `0`                    | Throwaway demos. Default. ~$0 when idle. |
+| `service` | `"off"`              | `1`                    | Long-running apps (portfolio, internal). |
+
+```bash
+# Throwaway demo (default)
+demo-init static my-experiment
+
+# Always-on service
+demo-init static my-portfolio --profile service
+
+# Adopt an existing always-on Fly app
+cd my-existing-service && demo-init adopt --profile service
+```
+
+`just sync` reads the profile from `.demo-template-version`, so flipping profiles after the fact means editing that file (or re-running adopt). App-specific build args (e.g. `[build.args] VITE_*`) are *not* part of the profile — keep them in your generated `fly.toml`; Copier's three-way merge leaves them alone.
+
+---
+
 ## Day-to-day commands
 
 Each scaffolded demo ships with a `justfile` that wraps the platform calls. From inside a demo directory:
