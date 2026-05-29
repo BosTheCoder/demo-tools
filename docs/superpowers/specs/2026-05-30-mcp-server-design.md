@@ -39,6 +39,10 @@ New files:
 - `src/demo_tools/_reflect.py` — introspects the Typer apps into tool specs.
 - `src/demo_tools/mcp_server.py` — the MCP server (named `mcp_server` to avoid
   clashing with the `mcp` package import).
+- `src/demo_tools/__main__.py` — `python -m demo_tools` dispatcher that routes
+  `init …` → `init_app` and `demo …` → `demo_app`. Lets the MCP adapter invoke
+  the CLI via the running interpreter (see Execution) without depending on console
+  scripts being on `PATH`.
 
 ## Components
 
@@ -56,7 +60,9 @@ Produces a list of tool specs. Each spec carries:
   - Click `str` → `string`, `bool` → `boolean`, `int` → `integer`.
   - Required Click arguments → required schema fields.
   - Param help → field `description`.
-- `argv_prefix` — the base argv for the command, e.g. `["demo-init", "scaffold"]`.
+- `argv_prefix` — the base argv for the command, built around the running
+  interpreter rather than a `PATH` name, e.g.
+  `[sys.executable, "-m", "demo_tools", "init", "scaffold"]`.
 - `destructive` — bool, from a small explicit set (see below).
 
 `DESTRUCTIVE_COMMANDS = {"prune"}` lives here. It is the one manual touchpoint, and
@@ -70,15 +76,19 @@ tool set is generated dynamically. Implements two handlers:
 - `list_tools()` — returns one MCP `Tool` per reflected spec. Destructive specs get the
   `destructiveHint` annotation so the client (Claude Code) prompts before running.
 - `call_tool(name, arguments)` — looks up the spec, builds an argv from
-  `argv_prefix` + the supplied arguments, runs the installed console script as a
-  **subprocess with stdin closed**, and returns stdout/stderr/exit code as the tool
-  result (non-zero exit surfaced as an error result).
+  `argv_prefix` + the supplied arguments, runs it as a **subprocess with stdin closed**
+  via `sys.executable -m demo_tools …` (the interpreter running the server, so it works
+  under `uv tool install`, `uv run`, editable, or a plain venv with no `PATH`
+  dependency), and returns stdout/stderr/exit code as the tool result (non-zero exit
+  surfaced as an error result). Subprocess (not in-process) keeps a misbehaving or
+  long-running command — e.g. `prune` shelling out to `fly` — isolated from the server.
 
 `main()` runs the server over stdio. Wired as a console script.
 
 ### Argv builder
 
 Maps tool arguments to CLI flags/positionals using the reflected param metadata:
+starting from `argv_prefix` (`[sys.executable, "-m", "demo_tools", <app>, <command>]`),
 positional Click arguments become positional argv entries; options become
 `--name value` (or bare `--flag` for booleans). Lives in `_reflect.py` (it needs the
 same metadata) and is unit-tested independently.
@@ -107,8 +117,12 @@ to ask for approval before running `prune`.
   - New optional dependency group: `[project.optional-dependencies] mcp = ["mcp>=1.2"]`
     so the base CLI install stays lean.
 - Install with MCP support: `uv tool install --editable ".[mcp]"`.
-- Register with Claude Code: `claude mcp add demo-tools -- demo-mcp` (stdio).
-- README section documenting install + registration.
+- Register with Claude Code (stdio). Either form works, since execution no longer
+  depends on console scripts being on `PATH`:
+  - installed: `claude mcp add demo-tools -- demo-mcp`
+  - from a clone without install:
+    `claude mcp add demo-tools -- uv run --directory /path/to/demo-tools demo-mcp`
+- README section documenting install + both registration forms.
 
 ## Testing
 
@@ -116,7 +130,10 @@ to ask for approval before running `prune`.
   list contains every current command (`demo_init.scaffold`, `demo_init.adopt`,
   `demo.list`, `demo.prune`) with correct required fields — e.g. `scaffold` requires
   `stack` and `name`.
-- **Argv builder**: tool name + arguments → expected argv (positionals + options).
+- **Argv builder**: tool name + arguments → expected argv (positionals + options),
+  prefixed with `[sys.executable, "-m", "demo_tools", <app>, <command>]`.
+- **`__main__` dispatcher**: `python -m demo_tools init …` routes to `init_app` and
+  `demo …` to `demo_app` (assert via a CliRunner / subprocess on a read-only command).
 - **`call_tool`**: with the subprocess call stubbed (pytest-mock), assert the correct
   argv is built, and that the `prune` tool **omits `--yes` unless `confirm: true`** (and
   passes `--dry-run` by default).
