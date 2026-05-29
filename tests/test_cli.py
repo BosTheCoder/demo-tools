@@ -80,6 +80,35 @@ def test_adopt_stack_option_skips_detection(mocker):
     spy.assert_called_once_with("demo", stack="fastapi", yes=True)
 
 
+def test_run_adopt_with_stack_skips_detection(tmp_path, mocker):
+    """_run_adopt called directly: when stack is given, detect_stack is never called."""
+    (tmp_path / "Dockerfile").write_text("FROM alpine\n")
+    mocker.patch("pathlib.Path.cwd", return_value=tmp_path)
+    detect = mocker.patch("demo_tools.adopt.detect_stack")
+    overlay = mocker.patch("demo_tools.adopt.overlay_infra")
+
+    from demo_tools.cli import _run_adopt
+    _run_adopt("demo", stack="fastapi", yes=True)
+
+    detect.assert_not_called()
+    assert overlay.call_args.kwargs["stack"] == "fastapi"
+
+
+def test_run_adopt_unknown_stack_raises_exit(tmp_path, mocker):
+    """_run_adopt called directly: an unknown stack raises typer.Exit and never calls overlay_infra."""
+    import pytest
+    import typer
+    (tmp_path / "Dockerfile").write_text("FROM alpine\n")
+    mocker.patch("pathlib.Path.cwd", return_value=tmp_path)
+    overlay = mocker.patch("demo_tools.adopt.overlay_infra")
+
+    from demo_tools.cli import _run_adopt
+    with pytest.raises(typer.Exit):
+        _run_adopt("demo", stack="bogus", yes=True)
+
+    overlay.assert_not_called()
+
+
 def test_prune_dry_run_lists_without_destroying(mocker):
     mocker.patch("demo_tools.fleet.list_apps", return_value=[{"name": "old"}])
     mocker.patch(

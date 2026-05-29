@@ -57,7 +57,7 @@ def _run_adopt(profile: str, stack: str | None = None, yes: bool = False) -> Non
 
     if stack not in _ADOPT_DEFAULTS:
         typer.echo(
-            f"Error: unknown stack '{stack}'. Valid: {', '.join(VALID_STACKS)}", err=True
+            f"Error: unknown stack '{stack}'. Valid: {', '.join(_ADOPT_DEFAULTS)}", err=True
         )
         raise typer.Exit(1)
 
