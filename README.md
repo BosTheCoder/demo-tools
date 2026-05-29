@@ -39,8 +39,15 @@ Throwaway demos shouldn't take an afternoon to host. With `demo-tools`:
 
 ```bash
 # Prerequisites: uv (https://astral.sh/uv) + flyctl (https://fly.io/install)
+
+# Local clone — editable, reflects your edits live (recommended if you tweak it):
+git clone https://github.com/BosTheCoder/demo-tools && cd demo-tools
+uv tool install --editable .
+
+# …or the published version, if you just want to use it:
 uv tool install git+https://github.com/BosTheCoder/demo-tools
 
+# Then, from anywhere:
 demo-init scaffold <stack> <name>
 cd <name>
 just dev          # local docker compose
@@ -49,7 +56,7 @@ just deploy       # ship to Fly + ensure cert
 
 Run `demo-init` with no arguments to see the six stacks listed below, with example invocations.
 
-> Hacking on demo-tools itself, or want to run a local clone instead of the published version? See [Running a local copy](#running-a-local-copy) for `uv run` and editable-install options.
+> Want to run without a global install? See [Running a local copy](#running-a-local-copy) for the `uv run` and snapshot options, plus editable-install caveats.
 
 ---
 
