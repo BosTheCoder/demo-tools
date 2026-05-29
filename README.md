@@ -219,11 +219,35 @@ git clone https://github.com/BosTheCoder/demo-tools
 cd demo-tools
 
 uv sync                               # install dev deps
-uv run pytest                         # 58 tests, ~5s
-
-# install your local copy as the live `demo-init` / `demo` binaries:
-uv tool install --reinstall --from . demo-tools
+uv run pytest                         # 77 tests, ~10s
 ```
+
+### Running a local copy
+
+The `uv tool install git+https://…` in the quick start snapshots a published
+commit — it does **not** see local edits. To exercise your working tree, pick
+the mode that matches what you're doing:
+
+| Use case | Command | Reflects local edits? |
+| -------- | ------- | --------------------- |
+| **Iterating / testing changes** (recommended) | `uv run demo-init scaffold static foo` | Always — runs straight from source via the project venv + `uv.lock`. Nothing installed globally. |
+| **Using the tool day-to-day while tweaking it** | `uv tool install --editable .` | Live, for `.py` code *and* the bundled `_data/` templates/starters (their paths resolve relative to the source file). Reinstall only when **dependencies**, **entry points**, or the **Python constraint** change. |
+| **Pinning a local snapshot** | `uv tool install --reinstall --from . demo-tools` | No — freezes current state; re-run with `--reinstall` to update. |
+
+For most development `uv run` is cleanest: it always reflects your working tree
+with zero global side effects. Use `--editable` when you want the real `demo` /
+`demo-init` commands on your `PATH` while iterating.
+
+Two caveats:
+
+- **An editable install couples your global commands to your working tree.**
+  Leave the repo mid-edit in a broken state and your global `demo` /
+  `demo-init` break too. `uv run` avoids this.
+- **`just sync` / `copier update` in generated demos always fetch the template
+  from GitHub** (`TEMPLATE_GIT_URL` in `_resources.py`), not your local edits.
+  Initial scaffolding uses the bundled local templates, so an editable install
+  lets you test *scaffolding* against local template changes — but to test the
+  *update* flow you must push to GitHub first.
 
 The Copier template lives at `src/demo_tools/_data/template/`. Stack-specific scaffolders live at `src/demo_tools/stacks/`. Tests are pytest with `subprocess.run` mocked for npx/npm calls so they're fast and offline.
 
