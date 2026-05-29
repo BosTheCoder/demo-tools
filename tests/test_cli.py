@@ -18,18 +18,10 @@ def test_demo_app_help_lists_list_and_prune():
     assert "prune" in result.stdout
 
 
-def test_init_positional_shorthand_routes_to_scaffold(mocker):
+def test_init_bare_stack_name_is_not_a_command(mocker):
+    """A bare stack name is not a subcommand; scaffold requires the explicit word."""
     spy = mocker.patch("demo_tools.cli._run_scaffold")
     result = runner.invoke(init_app, ["nextjs", "my-demo"])
-    assert result.exit_code == 0, result.stdout
-    spy.assert_called_once_with("nextjs", "my-demo", "demo")
-
-
-def test_init_unknown_first_arg_does_not_call_scaffold(mocker):
-    """An unknown stack name must NOT be intercepted as positional shorthand."""
-    spy = mocker.patch("demo_tools.cli._run_scaffold")
-    result = runner.invoke(init_app, ["unknown-stack", "name"])
-    # Should fall through to Click's "no such command" path
     assert result.exit_code != 0
     spy.assert_not_called()
 
@@ -63,14 +55,6 @@ def test_scaffold_command_forwards_profile_service(mocker):
     """--profile service is forwarded to _run_scaffold."""
     spy = mocker.patch("demo_tools.cli._run_scaffold")
     result = runner.invoke(init_app, ["scaffold", "nextjs", "my-app", "--profile", "service"])
-    assert result.exit_code == 0, result.stdout
-    spy.assert_called_once_with("nextjs", "my-app", "service")
-
-
-def test_positional_shorthand_supports_profile_flag(mocker):
-    """`demo-init nextjs my-app --profile service` (shorthand) forwards profile."""
-    spy = mocker.patch("demo_tools.cli._run_scaffold")
-    result = runner.invoke(init_app, ["nextjs", "my-app", "--profile", "service"])
     assert result.exit_code == 0, result.stdout
     spy.assert_called_once_with("nextjs", "my-app", "service")
 

@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import click
 import typer
-from typer.core import TyperGroup
 
 VALID_STACKS = ("nextjs", "nextjs-fastapi", "fastapi", "streamlit", "static", "bare")
 
@@ -68,26 +66,9 @@ def _prompt_stack() -> str:
     ).strip()
 
 
-class _InitGroup(TyperGroup):
-    """Routes bare ``demo-init <stack> <name>`` to the ``scaffold`` subcommand.
-
-    Click resolves the subcommand before any callback runs, so we can't use a
-    Typer callback + ``ctx.args`` to peek at unparsed positional args (the
-    group's ``parse_args`` would have already failed). Instead we rewrite the
-    arg list at ``resolve_command`` time when the first arg is a known stack.
-    """
-
-    def resolve_command(
-        self, ctx: click.Context, args: list[str]
-    ) -> tuple[str | None, click.Command | None, list[str]]:
-        if args and args[0] in VALID_STACKS:
-            args = ["scaffold", *args]
-        return super().resolve_command(ctx, args)
-
-
 _INIT_HELP = """Scaffold a new demo or adopt an existing dockerized repo.
 
-Stacks (positional shorthand: demo-init <stack> <name>):
+Stacks (used with the scaffold command: demo-init scaffold <stack> <name>):
 
   nextjs          Next.js + Tailwind, single Fly app
   nextjs-fastapi  Next.js web + FastAPI api, dual Fly app (api on .internal)
@@ -98,13 +79,12 @@ Stacks (positional shorthand: demo-init <stack> <name>):
 
 Examples:
 
-  demo-init static my-site
-  demo-init nextjs my-app
+  demo-init scaffold static my-site
+  demo-init scaffold nextjs my-app
   demo-init adopt
 """
 
 init_app = typer.Typer(
-    cls=_InitGroup,
     no_args_is_help=True,
     help=_INIT_HELP,
 )

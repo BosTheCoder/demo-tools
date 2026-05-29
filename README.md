@@ -13,7 +13,7 @@ A CLI + [Copier](https://copier.readthedocs.io/) template for scaffolding throwa
 [![Status: alpha](https://img.shields.io/badge/status-alpha-orange)]()
 
 ```bash
-demo-init nextjs chord-detector
+demo-init scaffold nextjs chord-detector
 cd chord-detector && just deploy
 # → https://chord-detector.fly.dev
 # → https://chord-detector.demos.buildwithbos.com
@@ -41,7 +41,7 @@ Throwaway demos shouldn't take an afternoon to host. With `demo-tools`:
 # Prerequisites: uv (https://astral.sh/uv) + flyctl (https://fly.io/install)
 uv tool install git+https://github.com/BosTheCoder/demo-tools
 
-demo-init <stack> <name>
+demo-init scaffold <stack> <name>
 cd <name>
 just dev          # local docker compose
 just deploy       # ship to Fly + ensure cert
@@ -77,10 +77,10 @@ Every demo is scaffolded under a **profile** that bundles its Fly auto-stop econ
 
 ```bash
 # Throwaway demo (default)
-demo-init static my-experiment
+demo-init scaffold static my-experiment
 
 # Always-on service
-demo-init static my-portfolio --profile service
+demo-init scaffold static my-portfolio --profile service
 
 # Adopt an existing always-on Fly app
 cd my-existing-service && demo-init adopt --profile service
