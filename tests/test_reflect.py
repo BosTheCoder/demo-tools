@@ -1,4 +1,4 @@
-from demo_tools._reflect import reflect_tools
+from demo_tools._reflect import build_argv, reflect_tools
 
 
 def _by_name():
@@ -49,3 +49,24 @@ def test_scaffold_params_positionals_vs_option():
 def test_option_help_becomes_description():
     schema = _by_name()["demo.prune"]["input_schema"]
     assert "description" in schema["properties"]["dry_run"]
+
+
+def test_build_argv_scaffold_positionals_then_option():
+    spec = _by_name()["demo_init.scaffold"]
+    argv = build_argv(spec, {"stack": "nextjs", "name": "foo", "profile": "service"})
+    assert argv[1:] == [
+        "-m", "demo_tools", "init", "scaffold",
+        "nextjs", "foo", "--profile", "service",
+    ]
+
+
+def test_build_argv_omits_false_flag():
+    spec = _by_name()["demo.prune"]
+    argv = build_argv(spec, {"dry_run": False})
+    assert "--dry-run" not in argv
+
+
+def test_build_argv_includes_true_flag():
+    spec = _by_name()["demo.prune"]
+    argv = build_argv(spec, {"dry_run": True})
+    assert "--dry-run" in argv

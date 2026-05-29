@@ -84,3 +84,24 @@ def reflect_tools() -> list[dict]:
                 }
             )
     return tools
+
+
+def build_argv(spec: dict, arguments: dict) -> list[str]:
+    """Turn a tool spec + arguments into an argv for `sys.executable -m demo_tools`."""
+    argv = list(spec["argv_prefix"])
+    args = arguments or {}
+    # Positional arguments first, in declared order.
+    for param in spec["params"]:
+        if param["kind"] == "argument" and param["name"] in args:
+            argv.append(str(args[param["name"]]))
+    # Then options.
+    for param in spec["params"]:
+        if param["kind"] != "option" or param["name"] not in args:
+            continue
+        value = args[param["name"]]
+        if param["is_flag"]:
+            if value:
+                argv.append(param["opt"])
+        else:
+            argv.extend([param["opt"], str(value)])
+    return argv
