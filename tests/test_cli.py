@@ -71,3 +71,31 @@ def test_adopt_command_forwards_profile_service(mocker):
     result = runner.invoke(init_app, ["adopt", "--profile", "service"])
     assert result.exit_code == 0, result.stdout
     spy.assert_called_once_with("service")
+
+
+def test_prune_dry_run_lists_without_destroying(mocker):
+    mocker.patch("demo_tools.fleet.list_apps", return_value=[{"name": "old"}])
+    mocker.patch(
+        "demo_tools.fleet.list_demos_only",
+        return_value=[{"name": "old", "status": "stopped", "kind": "nextjs"}],
+    )
+
+    def fake_run(argv, *a, **k):
+        if argv[:2] == ["fly", "status"]:
+            return mocker.Mock(
+                returncode=0,
+                stdout='{"App":{"CreatedAt":"2020-01-01T00:00:00Z"}}',
+            )
+        return mocker.Mock(returncode=0, stdout="", stderr="")
+
+    run = mocker.patch("subprocess.run", side_effect=fake_run)
+
+    result = runner.invoke(demo_app, ["prune", "--dry-run"])
+
+    assert result.exit_code == 0, result.stdout
+    assert "old" in result.stdout
+    destroy = [
+        c for c in run.call_args_list
+        if c.args and c.args[0][:3] == ["fly", "apps", "destroy"]
+    ]
+    assert destroy == []

@@ -140,6 +140,9 @@ def list_demos() -> None:
 def prune(
     older_than: str = typer.Option("14d", "--older-than"),
     yes: bool = typer.Option(False, "--yes", "-y"),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="List candidates without destroying anything."
+    ),
 ) -> None:
     """Interactively destroy demos older than the given age."""
     import datetime as dt
@@ -174,6 +177,10 @@ def prune(
     typer.echo(f"Candidates older than {older_than}:")
     for name, created, _kind in candidates:
         typer.echo(f"  {name}  (created {created:%Y-%m-%d})")
+
+    if dry_run:
+        typer.echo("(dry run — nothing destroyed)")
+        return
 
     for name, _created, kind in candidates:
         if not yes:
