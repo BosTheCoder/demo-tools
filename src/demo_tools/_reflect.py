@@ -30,7 +30,7 @@ def _long_opt(param: click.Option) -> str:
 
 
 def _param_schema(param: click.Parameter) -> dict:
-    if isinstance(param, click.Option) and param.is_flag:
+    if param.param_type_name == "option" and param.is_flag:
         return {"type": "boolean"}
     type_name = getattr(param.type, "name", "text")
     return {"type": _TYPE_MAP.get(type_name, "string")}
@@ -53,7 +53,7 @@ def reflect_tools() -> list[dict]:
                 if param.name in (None, "help"):
                     continue
                 schema = _param_schema(param)
-                is_option = isinstance(param, click.Option)
+                is_option = param.param_type_name == "option"
                 if is_option and param.help:
                     schema["description"] = param.help
                 properties[param.name] = schema
