@@ -15,6 +15,9 @@ dependencies = [
 demo-init = "demo_tools.cli:init_app"
 demo = "demo_tools.cli:demo_app"
 
+[project.optional-dependencies]
+mcp = ["mcp>=1.6"]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
