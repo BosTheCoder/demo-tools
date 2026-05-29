@@ -28,7 +28,7 @@ _ADOPT_DEFAULTS = {
 }
 
 
-def _run_adopt(profile: str) -> None:
+def _run_adopt(profile: str, stack: str | None = None, yes: bool = False) -> None:
     from pathlib import Path
     from .adopt import detect_stack, overlay_infra
 
@@ -39,17 +39,27 @@ def _run_adopt(profile: str) -> None:
         typer.echo("To scaffold a new demo: demo-init <stack> <name>", err=True)
         raise typer.Exit(1)
 
-    detected = detect_stack(repo)
-    if detected:
-        ans = typer.prompt(
-            f"Detected stack: {detected}. Confirm? [Y/n]",
-            default="Y",
-            show_default=False,
-        ).strip().lower()
-        stack = detected if ans in {"", "y", "yes"} else _prompt_stack()
-    else:
-        typer.echo("Could not detect stack from package.json / requirements.txt.")
-        stack = _prompt_stack()
+    if stack is None:
+        detected = detect_stack(repo)
+        if detected:
+            if yes:
+                stack = detected
+            else:
+                ans = typer.prompt(
+                    f"Detected stack: {detected}. Confirm? [Y/n]",
+                    default="Y",
+                    show_default=False,
+                ).strip().lower()
+                stack = detected if ans in {"", "y", "yes"} else _prompt_stack()
+        else:
+            typer.echo("Could not detect stack from package.json / requirements.txt.")
+            stack = _prompt_stack()
+
+    if stack not in _ADOPT_DEFAULTS:
+        typer.echo(
+            f"Error: unknown stack '{stack}'. Valid: {', '.join(VALID_STACKS)}", err=True
+        )
+        raise typer.Exit(1)
 
     name = repo.name
     stateful, port = _ADOPT_DEFAULTS[stack]
@@ -112,9 +122,15 @@ def scaffold(
 
 
 @init_app.command("adopt")
-def adopt(profile: str = _PROFILE_OPTION) -> None:
+def adopt(
+    profile: str = _PROFILE_OPTION,
+    stack: str = typer.Option(None, "--stack", help="Skip detection; use this stack."),
+    yes: bool = typer.Option(
+        False, "--yes", "-y", help="Skip the detection-confirm prompt."
+    ),
+) -> None:
     """Overlay infra onto an existing dockerized repo in the current directory."""
-    _run_adopt(profile)
+    _run_adopt(profile, stack=stack, yes=yes)
 
 
 @demo_app.command("list")

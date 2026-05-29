@@ -32,7 +32,7 @@ def test_init_adopt_subcommand_does_not_call_scaffold(mocker):
     adopt_spy = mocker.patch("demo_tools.cli._run_adopt")
     runner.invoke(init_app, ["adopt"])
     spy.assert_not_called()
-    adopt_spy.assert_called_once_with("demo")
+    adopt_spy.assert_called_once_with("demo", stack=None, yes=False)
 
 
 def test_init_explicit_scaffold_form_still_works(mocker):
@@ -63,14 +63,21 @@ def test_adopt_command_forwards_profile_default(mocker):
     spy = mocker.patch("demo_tools.cli._run_adopt")
     result = runner.invoke(init_app, ["adopt"])
     assert result.exit_code == 0, result.stdout
-    spy.assert_called_once_with("demo")
+    spy.assert_called_once_with("demo", stack=None, yes=False)
 
 
 def test_adopt_command_forwards_profile_service(mocker):
     spy = mocker.patch("demo_tools.cli._run_adopt")
     result = runner.invoke(init_app, ["adopt", "--profile", "service"])
     assert result.exit_code == 0, result.stdout
-    spy.assert_called_once_with("service")
+    spy.assert_called_once_with("service", stack=None, yes=False)
+
+
+def test_adopt_stack_option_skips_detection(mocker):
+    spy = mocker.patch("demo_tools.cli._run_adopt")
+    result = runner.invoke(init_app, ["adopt", "--stack", "fastapi", "--yes"])
+    assert result.exit_code == 0, result.stdout
+    spy.assert_called_once_with("demo", stack="fastapi", yes=True)
 
 
 def test_prune_dry_run_lists_without_destroying(mocker):
