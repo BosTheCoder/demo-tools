@@ -49,6 +49,8 @@ just deploy       # ship to Fly + ensure cert
 
 Run `demo-init` with no arguments to see the six stacks listed below, with example invocations.
 
+> Hacking on demo-tools itself, or want to run a local clone instead of the published version? See [Running a local copy](#running-a-local-copy) for `uv run` and editable-install options.
+
 ---
 
 ## Stack reference
