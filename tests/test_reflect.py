@@ -70,3 +70,18 @@ def test_build_argv_includes_true_flag():
     spec = _by_name()["demo.prune"]
     argv = build_argv(spec, {"dry_run": True})
     assert "--dry-run" in argv
+
+
+def test_build_argv_skips_none_value_option():
+    spec = _by_name()["demo.prune"]
+    argv = build_argv(spec, {"older_than": None, "dry_run": True})
+    assert "--older-than" not in argv
+    assert "None" not in argv
+    assert "--dry-run" in argv
+
+
+def test_build_argv_skips_none_positional():
+    spec = _by_name()["demo_init.scaffold"]
+    argv = build_argv(spec, {"stack": "nextjs", "name": None})
+    assert "None" not in argv
+    assert "nextjs" in argv
