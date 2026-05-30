@@ -14,6 +14,10 @@ dependencies = [
 [project.scripts]
 demo-init = "demo_tools.cli:init_app"
 demo = "demo_tools.cli:demo_app"
+demo-mcp = "demo_tools.mcp_server:main"
+
+[project.optional-dependencies]
+mcp = ["mcp>=1.6"]
 
 [build-system]
 requires = ["hatchling"]

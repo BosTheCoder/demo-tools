@@ -99,8 +99,10 @@ The MCP transport has no stdin, so commands that prompt must be made
 non-interactive-capable. Small CLI refactor (also improves the CLI for humans):
 
 - **`prune`** gains a `--dry-run` flag: list candidates, destroy nothing. The `prune`
-  MCP tool **defaults to dry-run**; it only passes `--yes` (destroy) when called with
-  `confirm: true`.
+  MCP tool **defaults to dry-run** (the server injects `dry_run=true` unless the caller
+  explicitly sets it); destruction requires explicitly passing `dry_run: false` and
+  `yes: true`. (Confirmation is expressed via the reflected CLI flags, not a synthetic
+  `confirm` field, keeping reflection generic.)
 - **`adopt`** gains `--stack` and `--yes` options so its stack-detection confirmation
   can be answered non-interactively.
 
@@ -114,7 +116,8 @@ to ask for approval before running `prune`.
 
 - `pyproject.toml`:
   - New console script: `demo-mcp = "demo_tools.mcp_server:main"`.
-  - New optional dependency group: `[project.optional-dependencies] mcp = ["mcp>=1.2"]`
+  - New optional dependency group: `[project.optional-dependencies] mcp = ["mcp>=1.6"]`
+    (>=1.6 for `ToolAnnotations` support)
     so the base CLI install stays lean.
 - Install with MCP support: `uv tool install --editable ".[mcp]"`.
 - Register with Claude Code (stdio). Either form works, since execution no longer
@@ -135,7 +138,7 @@ to ask for approval before running `prune`.
 - **`__main__` dispatcher**: `python -m demo_tools init …` routes to `init_app` and
   `demo …` to `demo_app` (assert via a CliRunner / subprocess on a read-only command).
 - **`call_tool`**: with the subprocess call stubbed (pytest-mock), assert the correct
-  argv is built, and that the `prune` tool **omits `--yes` unless `confirm: true`** (and
+  argv is built, and that the `prune` tool **omits `--yes` unless explicitly set** (and
   passes `--dry-run` by default).
 - **Smoke**: `list_tools()` returns a non-empty list and every spec has a valid schema.
 
@@ -143,5 +146,5 @@ to ask for approval before running `prune`.
 
 - `demo-mcp` starts over stdio and lists a tool per current CLI command.
 - New CLI commands appear as tools with no MCP-layer code change.
-- `prune` is non-destructive unless `confirm: true`; flagged `destructiveHint`.
+- `prune` is non-destructive unless called with `dry_run: false` + `yes: true`; flagged `destructiveHint`.
 - Tests above pass.

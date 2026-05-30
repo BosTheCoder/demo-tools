@@ -142,8 +142,32 @@ The `demo` CLI works across every demo you've shipped:
 ```bash
 demo list                            # rich table of all demos with URLs and status
 demo prune --older-than 14d          # interactive cleanup (per-item y/N)
+demo prune --older-than 14d --dry-run # list candidates, destroy nothing
 demo prune --older-than 14d --yes    # non-interactive
 ```
+
+---
+
+## MCP server
+
+Expose every `demo-tools` command to an MCP client (e.g. Claude Code). Each CLI
+command is reflected into a tool automatically — add a new command and it shows up
+as a tool with no extra wiring.
+
+```bash
+# Install with MCP support
+uv tool install --editable ".[mcp]"
+
+# Register with Claude Code (stdio). Either form works — execution does not
+# depend on the console scripts being on PATH:
+claude mcp add demo-tools -- demo-mcp
+# …or run straight from a clone, no install needed:
+claude mcp add demo-tools -- uv run --directory /path/to/demo-tools demo-mcp
+```
+
+`demo.prune` is dry-run by default over MCP; destruction requires explicitly
+passing `dry_run: false` and `yes: true`. It is flagged destructive so the client
+asks before running it.
 
 ---
 
