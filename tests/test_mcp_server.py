@@ -54,3 +54,18 @@ def test_run_tool_nonzero_exit_raises(mocker):
     )
     with pytest.raises(RuntimeError, match="boom"):
         mcp_server.run_tool("demo.list", {})
+
+
+def test_list_tools_handler_returns_all_tools():
+    import anyio
+    from demo_tools import mcp_server
+
+    tools = anyio.run(mcp_server._list_tools)
+    names = sorted(t.name for t in tools)
+    assert names == ["demo.list", "demo.prune", "demo_init.adopt", "demo_init.scaffold"]
+    for t in tools:
+        assert t.inputSchema["type"] == "object"
+    prune = next(t for t in tools if t.name == "demo.prune")
+    assert prune.annotations.destructiveHint is True
+    list_tool = next(t for t in tools if t.name == "demo.list")
+    assert list_tool.annotations.readOnlyHint is True

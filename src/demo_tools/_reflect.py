@@ -11,6 +11,9 @@ from .cli import demo_app, init_app
 # for dangerous commands — normal commands need no entry here.
 DESTRUCTIVE_COMMANDS = {"prune"}
 
+# Commands that only read state — safe for clients to call without confirmation.
+READONLY_COMMANDS = {"list"}
+
 # (router word for __main__, tool-name prefix, Typer app)
 _APPS = [
     ("init", "demo_init", init_app),
@@ -81,6 +84,7 @@ def reflect_tools() -> list[dict]:
                     ],
                     "params": params,
                     "destructive": cmd_name in DESTRUCTIVE_COMMANDS,
+                    "readonly": cmd_name in READONLY_COMMANDS,
                 }
             )
     return tools

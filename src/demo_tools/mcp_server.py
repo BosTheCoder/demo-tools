@@ -42,7 +42,10 @@ async def _list_tools() -> list[types.Tool]:
             name=spec["name"],
             description=spec["description"] or spec["name"],
             inputSchema=spec["input_schema"],
-            annotations=types.ToolAnnotations(destructiveHint=spec["destructive"]),
+            annotations=types.ToolAnnotations(
+                destructiveHint=spec["destructive"],
+                readOnlyHint=spec["readonly"],
+            ),
         )
         for spec in _SPECS
     ]
@@ -50,7 +53,8 @@ async def _list_tools() -> list[types.Tool]:
 
 @server.call_tool()
 async def _call_tool(name: str, arguments: dict) -> list[types.TextContent]:
-    text = run_tool(name, arguments)
+    import anyio
+    text = await anyio.to_thread.run_sync(run_tool, name, arguments)
     return [types.TextContent(type="text", text=text or "(no output)")]
 
 

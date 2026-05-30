@@ -85,3 +85,10 @@ def test_build_argv_skips_none_positional():
     argv = build_argv(spec, {"stack": "nextjs", "name": None})
     assert "None" not in argv
     assert "nextjs" in argv
+
+
+def test_list_is_readonly_others_not():
+    tools = _by_name()
+    assert tools["demo.list"]["readonly"] is True
+    assert tools["demo.prune"]["readonly"] is False
+    assert tools["demo_init.scaffold"]["readonly"] is False
