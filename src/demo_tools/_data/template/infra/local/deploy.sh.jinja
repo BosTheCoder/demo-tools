@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# MANAGED BY demo-tools — DO NOT EDIT. Run `just sync` to update.
+set -euo pipefail
+HERE="$(cd "$(dirname "$0")" && pwd)"; source "$HERE/_lib.sh"
+preflight
+
+# Refuse to clobber a path already served by a different backend.
+existing="$(serve_status)"
+if grep -qE "(^|[[:space:]])${TS_PATH}([[:space:]]|/|$)" <<<"$existing" \
+   && ! grep -q "127.0.0.1:${INTERNAL_PORT}" <<<"$existing"; then
+  echo "ERROR: ${TS_PATH} is already served by a different backend." >&2
+  echo "Choose another path (re-scaffold with --tailscale-path /<other>) or free it:" >&2
+  echo "  ${TS[*]} serve --set-path ${TS_PATH} off" >&2
+  exit 1
+fi
+
+echo "==> Building + starting container (detached)"
+"${COMPOSE[@]}" up -d --build
+
+echo "==> Registering Tailscale serve: ${TS_PATH} -> 127.0.0.1:${INTERNAL_PORT}"
+# Exact form matches the working Calibre invocation: bare port arg, no admin needed.
+"${TS[@]}" serve --bg --set-path "${TS_PATH}" "${INTERNAL_PORT}"
+
+echo
+echo "Deployed (tailnet-only):"
+echo "  ${URL}"

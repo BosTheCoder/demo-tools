@@ -1,0 +1,45 @@
+# MANAGED BY demo-tools — DO NOT EDIT. Run `just sync` to update.
+#
+# Shared helpers for the `local` deploy target (persistent container on this
+# machine, exposed over Tailscale HTTPS). Sourced by the verb scripts in this
+# directory — not executed directly.
+set -euo pipefail
+
+APP="{{ name }}"
+INTERNAL_PORT="{{ internal_port }}"
+TS_HOST="{{ tailscale_host }}"
+TS_PATH="{{ tailscale_path }}"
+URL="https://${TS_HOST}${TS_PATH}"
+
+# Base compose + the local overlay (restart policy + bind-mount + ROOT_PATH).
+COMPOSE=(docker compose -f compose.yml -f compose.local.yml)
+{% if stack == "nextjs-fastapi" %}SVC="web"{% else %}SVC="app"{% endif %}
+
+# Resolve the Windows Tailscale CLI from WSL. The explicit /mnt/c path is safest
+# — the space in "Program Files" trips unquoted PATH lookups; fall back to a
+# PATH-resolved tailscale.exe only if the default install location moved.
+resolve_ts() {
+  if [[ -x "/mnt/c/Program Files/Tailscale/tailscale.exe" ]]; then
+    TS=("/mnt/c/Program Files/Tailscale/tailscale.exe")
+  elif command -v tailscale.exe >/dev/null 2>&1; then
+    TS=(tailscale.exe)
+  else
+    echo "ERROR: Tailscale CLI not found. This target only works on Bos-Desktop." >&2
+    exit 1
+  fi
+}
+
+# Fail early with a clear message if either half of the mechanism is down.
+preflight() {
+  resolve_ts
+  "${TS[@]}" status >/dev/null 2>&1 || { echo "ERROR: Tailscale is not running on the Windows host." >&2; exit 1; }
+  docker info >/dev/null 2>&1 || { echo "ERROR: Docker Desktop is not running." >&2; exit 1; }
+}
+
+# Current `tailscale serve` config (empty string if unavailable).
+serve_status() { "${TS[@]}" serve status 2>/dev/null || true; }
+
+# True when the app service's container is up (used for friendly hints).
+container_running() {
+  [[ -n "$("${COMPOSE[@]}" ps -q "$SVC" 2>/dev/null)" ]]
+}

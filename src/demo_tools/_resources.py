@@ -16,6 +16,12 @@ TEMPLATE_DIR = _PKG_ROOT / "_data" / "template"
 STARTERS_DIR = _PKG_ROOT / "_data" / "starters"
 DEFAULT_DOMAIN = "demos.buildwithbos.com"
 
+# Default deploy target and the local (Tailscale) target's host. The tailscale
+# path defaults to "/<name>" (computed per-project). These mirror the Copier
+# question defaults so the CLI can write concrete values into the answers file.
+DEFAULT_TARGET = "fly"
+DEFAULT_TAILSCALE_HOST = "bos-desktop.fish-grouper.ts.net"
+
 # Git URL that `copier update` (invoked by `just sync` from a demo) will fetch
 # from. Initial scaffold uses TEMPLATE_DIR (bundled package data, no network).
 # Updates need a VCS-tracked source — Copier rejects plain local paths for

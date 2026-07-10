@@ -9,3 +9,6 @@ __pycache__/
 .env*
 *.db
 .DS_Store
+
+# local target: host bind-mount for the container's persistent data (SQLite)
+data/

@@ -29,6 +29,9 @@ jobs:
     name: Deploy to Fly.io
     runs-on: ubuntu-latest
     env:
+      # CI always deploys to Fly, even for projects whose default target is
+      # `local` — `just deploy` dispatches on DEMO_TARGET.
+      DEMO_TARGET: fly
       FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
     steps:

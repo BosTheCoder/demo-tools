@@ -32,7 +32,9 @@ def test_init_adopt_subcommand_does_not_call_scaffold(mocker):
     adopt_spy = mocker.patch("demo_tools.cli._run_adopt")
     runner.invoke(init_app, ["adopt"])
     spy.assert_not_called()
-    adopt_spy.assert_called_once_with("demo", stack=None, yes=False)
+    adopt_spy.assert_called_once_with(
+        "demo", stack=None, yes=False, target="fly", tailscale_path=None
+    )
 
 
 def test_init_explicit_scaffold_form_still_works(mocker):
@@ -40,7 +42,7 @@ def test_init_explicit_scaffold_form_still_works(mocker):
     spy = mocker.patch("demo_tools.cli._run_scaffold")
     result = runner.invoke(init_app, ["scaffold", "nextjs", "my-demo"])
     assert result.exit_code == 0, result.stdout
-    spy.assert_called_once_with("nextjs", "my-demo", "demo")
+    spy.assert_called_once_with("nextjs", "my-demo", "demo", "fly", None)
 
 
 def test_scaffold_command_forwards_profile_default(mocker):
@@ -48,7 +50,7 @@ def test_scaffold_command_forwards_profile_default(mocker):
     spy = mocker.patch("demo_tools.cli._run_scaffold")
     result = runner.invoke(init_app, ["scaffold", "nextjs", "my-app"])
     assert result.exit_code == 0, result.stdout
-    spy.assert_called_once_with("nextjs", "my-app", "demo")
+    spy.assert_called_once_with("nextjs", "my-app", "demo", "fly", None)
 
 
 def test_scaffold_command_forwards_profile_service(mocker):
@@ -56,28 +58,34 @@ def test_scaffold_command_forwards_profile_service(mocker):
     spy = mocker.patch("demo_tools.cli._run_scaffold")
     result = runner.invoke(init_app, ["scaffold", "nextjs", "my-app", "--profile", "service"])
     assert result.exit_code == 0, result.stdout
-    spy.assert_called_once_with("nextjs", "my-app", "service")
+    spy.assert_called_once_with("nextjs", "my-app", "service", "fly", None)
 
 
 def test_adopt_command_forwards_profile_default(mocker):
     spy = mocker.patch("demo_tools.cli._run_adopt")
     result = runner.invoke(init_app, ["adopt"])
     assert result.exit_code == 0, result.stdout
-    spy.assert_called_once_with("demo", stack=None, yes=False)
+    spy.assert_called_once_with(
+        "demo", stack=None, yes=False, target="fly", tailscale_path=None
+    )
 
 
 def test_adopt_command_forwards_profile_service(mocker):
     spy = mocker.patch("demo_tools.cli._run_adopt")
     result = runner.invoke(init_app, ["adopt", "--profile", "service"])
     assert result.exit_code == 0, result.stdout
-    spy.assert_called_once_with("service", stack=None, yes=False)
+    spy.assert_called_once_with(
+        "service", stack=None, yes=False, target="fly", tailscale_path=None
+    )
 
 
 def test_adopt_stack_option_skips_detection(mocker):
     spy = mocker.patch("demo_tools.cli._run_adopt")
     result = runner.invoke(init_app, ["adopt", "--stack", "fastapi", "--yes"])
     assert result.exit_code == 0, result.stdout
-    spy.assert_called_once_with("demo", stack="fastapi", yes=True)
+    spy.assert_called_once_with(
+        "demo", stack="fastapi", yes=True, target="fly", tailscale_path=None
+    )
 
 
 def test_run_adopt_with_stack_skips_detection(tmp_path, mocker):
