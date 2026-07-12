@@ -202,8 +202,11 @@ def _load_starter_app(root_path: str):
 
 
 def test_fastapi_root_path_routing_across_targets():
-    """Empty ROOT_PATH serves at '/'; '/<name>' serves under the non-stripping
-    proxy path — the same route decorator works on both Fly and local."""
+    """Empty ROOT_PATH serves at '/'; with ROOT_PATH="/<name>" the same route
+    decorator still matches — both the realistic stripped-prefix request
+    Tailscale actually sends ("/healthz") and a full-prefix request, because
+    Starlette's get_route_path() only strips root_path from paths that carry
+    it (see the design doc §5.4 correction, 2026-07-12)."""
     pytest.importorskip("fastapi")
     from fastapi.testclient import TestClient
 
@@ -211,8 +214,44 @@ def test_fastapi_root_path_routing_across_targets():
     assert TestClient(app_fly).get("/healthz").status_code == 200
 
     app_local = _load_starter_app("/tmp-demo")
-    # Tailscale forwards the full, unstripped path to the container.
+    # tailscale serve --set-path STRIPS the prefix, so the container really
+    # only ever sees "/healthz" — routing must work with the bare path.
+    assert TestClient(app_local).get("/healthz").status_code == 200
+    # A full-prefix request also still routes correctly (belt and braces).
     assert TestClient(app_local).get("/tmp-demo/healthz").status_code == 200
+
+
+def test_fastapi_starter_serves_static_via_route_not_mount():
+    """The starter must serve /static via a route, not a StaticFiles Mount —
+    a Mount only matches the full "/<name>/static/..." path and 404s once
+    Tailscale strips the prefix (design doc §5.4 correction, 2026-07-12)."""
+    main_src = (STARTERS_DIR / "fastapi" / "main.py").read_text()
+    code_lines = [ln for ln in main_src.splitlines() if not ln.strip().startswith("#")]
+    code_src = "\n".join(code_lines)
+    assert "import StaticFiles" not in code_src
+    assert "app.mount(" not in code_src
+
+    pytest.importorskip("fastapi")
+    from fastapi.testclient import TestClient
+
+    app = _load_starter_app("/tmp-demo")
+    static_dir = STARTERS_DIR / "fastapi" / "static"
+    static_dir.mkdir(exist_ok=True)
+    asset = static_dir / "app.css"
+    asset.write_text("body{color:red}")
+    try:
+        client = TestClient(app)
+        # Realistic stripped-prefix request (what Tailscale actually sends).
+        resp = client.get("/static/app.css")
+        assert resp.status_code == 200
+        assert resp.text == "body{color:red}"
+        # Path traversal outside STATIC_DIR must not be servable.
+        assert client.get("/static/../main.py").status_code in (404, 400)
+        # url_for still emits the correctly-prefixed URL for the browser.
+        assert app.url_path_for("static", path="app.css") == "/static/app.css"
+    finally:
+        asset.unlink()
+        static_dir.rmdir()
 
 
 # --- scaffold / adopt / CLI threading ---------------------------------------

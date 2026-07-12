@@ -50,7 +50,13 @@ RUN pip install -r requirements.txt
 COPY app/ ./
 RUN mkdir -p /data
 EXPOSE {{ internal_port }}
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "{{ internal_port }}"]
+# --proxy-headers + --forwarded-allow-ips=* trust the reverse proxy's
+# X-Forwarded-Proto header (Tailscale Serve on the local target, Fly's edge
+# on Fly) so url_for()/redirects emit https:// instead of http:// — without
+# it, browsers block the mixed-content http:// links on an https:// page.
+# Trusting all forwarded IPs is fine here: only the local proxy reaches the
+# container.
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "{{ internal_port }}", "--proxy-headers", "--forwarded-allow-ips=*"]
 {%- elif stack == "streamlit" %}
 FROM python:3.12-slim
 WORKDIR /app
