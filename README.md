@@ -154,7 +154,7 @@ Because both infra sets always exist, moving a local app to Fly is a flip plus a
 
 ## Day-to-day commands
 
-Each scaffolded demo ships with a `justfile` that wraps the platform calls. From inside a demo directory:
+Each scaffolded demo ships with a `justfile` that wraps the platform calls. From inside a demo directory. The table below describes the default **Fly** target; under `--target local` the same verbs act on the local container + Tailscale serve instead — see [Deploy targets: Fly vs local](#deploy-targets-fly-vs-local).
 
 | `just <verb>`           | What it does                                                            |
 | ----------------------- | ----------------------------------------------------------------------- |
