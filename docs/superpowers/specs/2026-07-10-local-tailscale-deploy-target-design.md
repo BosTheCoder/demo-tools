@@ -6,7 +6,16 @@
 Tailscale 1.98.2 requires Windows local admin for *every* serve-config write (path AND own-port,
 verified empirically). The feature accommodates this: `deploy` skips the serve write when the path
 is already registered (everyday re-deploys need no admin) and elevates via a UAC prompt only on a
-**first-time** registration or `destroy`. See §4.3, §6, §9, §12.
+**first-time** registration or `destroy`. See §4.3, §6, §9, §12. **Second correction (2026-07-12):**
+the "Tailscale forwards the path unstripped" claim throughout this doc was also **false** —
+`tailscale serve --set-path /<name> <port>` **STRIPS** the `/<name>` prefix before proxying; the
+container receives `/healthz`, `/static/app.css`, etc, never `/<name>/healthz`. This was confirmed
+empirically on Bos-Desktop and broke a real deployed app two ways: (1) uvicorn without
+`--proxy-headers` doesn't see `X-Forwarded-Proto: https`, so `url_for()` emits `http://` links that
+browsers block as mixed content on the `https://` page; (2) a `StaticFiles` Mount only matches the
+full `/<name>/static/...` path, so the stripped `/static/...` request 404s. The fix: keep
+`root_path=/<name>` for URL *generation* only, run uvicorn with `--proxy-headers
+--forwarded-allow-ips=*`, and serve static assets via a route, not a Mount. See §1, §4.3, §5.4.
 **Author:** design session (implementer has NOT seen the originating conversation — this doc is self-contained)
 
 ---
@@ -64,9 +73,10 @@ These are load-bearing — the mechanism below is built on them:
   invocation is `tailscale serve --bg --set-path /calibre 8080` (a **port proxy under a path** —
   **no admin**). The **only** step that needed one-time Windows admin (UAC) was serving the
   landing page's *filesystem path* at `/`; that is a shared-host prerequisite already completed.
-  **Tailscale forwards the full path without stripping it** — calibre therefore runs with
-  `--url-prefix /calibre`. This non-stripping behaviour is exactly why the app must be base-path
-  aware (see §5.4). Serve config persists in `tailscaled` state across reboots.
+  **Tailscale STRIPS the path prefix** before proxying (confirmed empirically 2026-07-12) — the
+  backend receives `/...` requests with `/calibre` already removed. This is exactly why the app
+  must be base-path aware for URL *generation* (see §5.4) even though incoming routing needs no
+  change. Serve config persists in `tailscaled` state across reboots.
 
 ---
 
@@ -114,7 +124,7 @@ These are load-bearing — the mechanism below is built on them:
  Kelvin's phone ──HTTPS──►  bos-desktop.fish-grouper.ts.net/<name>/...
  (on the tailnet)                       │
                           Tailscale (Windows service)   tailscale serve --bg --set-path /<name> <internal_port>
-                                        │  proxies /<name>/... to 127.0.0.1:<internal_port>/<name>/...  (path NOT stripped)
+                                        │  proxies /<name>/... to 127.0.0.1:<internal_port>/...  (prefix STRIPPED)
                           Docker Desktop published port (Windows localhost)
                                         │
                           app container  (restart: unless-stopped)  FastAPI(root_path="/<name>") listens 0.0.0.0:<internal_port>
@@ -249,10 +259,11 @@ argument), so a demo-tools app slots in next to `/calibre` under the same front 
   first registration. `destroy.sh` elevates once to deregister. Net cost: **one UAC per app
   lifecycle**, zero for everyday re-deploys/stops/starts. (A scheduled-task-triggered-elevated
   design was considered for fully-unattended registration and rejected by Kelvin as too heavy.)
-- **Tailscale does NOT strip the path prefix** before forwarding (documented in the Calibre task:
-  calibre runs with `--url-prefix /calibre`). The container therefore receives requests at
-  `/<name>/...`, so **the app must be base-path aware** — handled cleanly via one env var
-  (§5.4). This is the single seam that makes path-based routing work without per-target app code.
+- **Tailscale STRIPS the path prefix** before forwarding (confirmed empirically 2026-07-12). The
+  container therefore receives requests at `/...` — never `/<name>/...`. Route decorators need no
+  change, but **the app must still be base-path aware for URL generation** (outgoing links,
+  redirects, `url_for`) — handled cleanly via one env var (§5.4). This is the single seam that
+  makes path-based routing work without per-target app code.
 - **Own `/` on Fly, `/<name>` on local** — the `ROOT_PATH` env var (`""` vs `"/<name>"`) is the
   only thing that changes; the app image is identical (§8).
 
@@ -277,7 +288,7 @@ tailscale_host:
 
 tailscale_path:
   type: str
-  help: "URL path prefix under the shared Tailscale host (Tailscale does NOT strip it; the app is served here)"
+  help: "URL path prefix under the shared Tailscale host (Tailscale STRIPS it before proxying; the app is served here)"
   default: "/{{ name }}"
   when: "{{ target == 'local' }}"
 ```
@@ -457,9 +468,10 @@ services:
 2. The local infra scripts invoke **`tailscale.exe` (Windows)** from WSL via interop (the
    explicit `/mnt/c/Program Files/Tailscale/tailscale.exe` path, quoted). `tailscale serve
    --set-path /<name> <internal_port>` tells the Windows Tailscale to reverse-proxy the shared
-   host's `/<name>` path to **`127.0.0.1:<internal_port>` on Windows** (path forwarded
-   unstripped) — which Docker Desktop is serving. No WSL localhost-forwarding subtlety is
-   involved, because *both* the proxy and the published port live on the Windows host's loopback.
+   host's `/<name>` path to **`127.0.0.1:<internal_port>` on Windows** (the `/<name>` prefix is
+   **stripped** before proxying) — which Docker Desktop is serving. No WSL localhost-forwarding
+   subtlety is involved, because *both* the proxy and the published port live on the Windows
+   host's loopback.
 3. Tailscale terminates TLS with the tailnet Let's Encrypt cert and serves it on the tailnet at
    `bos-desktop.fish-grouper.ts.net/<name>`.
 
@@ -486,15 +498,23 @@ the real machine before wiring the rest (see §11 checklist step 0).**
 
 ### 5.4 App base-path coupling (the one place the app is prefix-aware)
 
-Because Tailscale `--set-path /<name>` **does not strip the prefix** (§1, §4.3), the container
-receives requests at `/<name>/...`. To keep app code **identical across targets**, inject the
-base path as an env var and read it in exactly one place:
+**Correction (2026-07-12):** Tailscale `--set-path /<name>` **STRIPS the prefix** before proxying
+(§1, §4.3) — the container receives requests at `/...`, never `/<name>/...`. Route decorators
+therefore need **no** change between targets (routing was never the issue). But two things still
+need the base path, both confirmed broken empirically before this fix:
 
-- **`ROOT_PATH`** — `""` on Fly and on `just dev` (app served at root), `"/<name>"` on local
-  (set by the `compose.local.yml` overlay, §5.1).
+- **URL generation** — `request.url_for(...)` and redirects need to know the prefix so links sent
+  to the *browser* resolve under `/<name>` on local. This is still driven by a single env var:
+  - **`ROOT_PATH`** — `""` on Fly and on `just dev` (app served at root), `"/<name>"` on local
+    (set by the `compose.local.yml` overlay, §5.1).
+- **HTTPS scheme detection** — uvicorn behind Tailscale's proxy only ever sees a plain HTTP
+  connection; without `--proxy-headers` it doesn't trust `X-Forwarded-Proto: https`, so
+  `url_for()` emits `http://` absolute URLs on an `https://` page, which browsers **block as mixed
+  content** (the whole UI loads unstyled/broken — this masked itself on `localhost`, where the
+  `http://` URL is directly reachable).
 
 **`fastapi` stack** (the downstream job-app driver): construct the app with `root_path` fed by the
-env var — the single line the starter must gain:
+env var, and run uvicorn with `--proxy-headers`:
 
 ```python
 import os
@@ -503,12 +523,18 @@ from fastapi import FastAPI
 app = FastAPI(root_path=os.getenv("ROOT_PATH", ""))   # "" on Fly/dev, "/job-tracker" on local
 ```
 
-Why this works with the non-stripping proxy: the starter pins **`fastapi>=0.115`**, whose
-Starlette computes the route-matching path relative to `root_path` (`get_route_path()`), i.e. it
-**strips `root_path` from the incoming path for routing**. So a request arriving as
-`/job-tracker/approve` with `root_path="/job-tracker"` is routed as `/approve`; with an empty
-`root_path` (Fly) the same route matches `/approve` directly. **No route decorators change
-between targets.**
+```
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", \
+     "--proxy-headers", "--forwarded-allow-ips=*"]
+```
+
+Why routing still works despite the stripped prefix: the starter pins **`fastapi>=0.115`**, whose
+Starlette computes the route-matching path via `get_route_path()`, which strips `root_path` from
+the incoming path *only if the incoming path actually starts with it*. A stripped request arriving
+as `/approve` doesn't start with `root_path="/job-tracker"`, so `get_route_path()` returns
+`/approve` unchanged and the route matches directly — exactly as it does with an empty `root_path`
+on Fly. **No route decorators change between targets**; `root_path` only affects what
+`url_for()`/redirects emit back to the browser.
 
 **HTMX / templates / static assets — the rule for the job-app UI:** every generated URL must
 carry the base path so it resolves under `/<name>` on local and under `/` on Fly. Concretely:
@@ -516,14 +542,18 @@ carry the base path so it resolves under `/<name>` on local and under `/` on Fly
   `request.scope["root_path"]` (FastAPI populates `root_path` in the request scope), **not**
   hard-coded absolute paths like `/static/app.css` or `hx-get="/approve"` — those would resolve
   to the **tailnet host root**, bypassing the app.
-- Mount static files on the app (`app.mount("/static", ...)`) so `url_for("static", path=...)`
-  emits `/<name>/static/...` on local and `/static/...` on Fly automatically.
+- Serve static files via a **route** (`@app.get("/static/{path:path}", name="static")` →
+  `FileResponse`, with a path-traversal guard), **not** `app.mount("/static", StaticFiles(...))`.
+  A Mount only matches the full `/<name>/static/...` path; since the prefix is stripped, the
+  incoming request is a bare `/static/...` that the Mount 404s on. A route matches either way, and
+  `url_for("static", path=...)` still emits the correctly-prefixed URL for the browser.
 - HTMX attributes should use the templated, root_path-prefixed URLs (e.g.
   `hx-get="{{ request.scope.root_path }}/approve"`), keeping the phone UI's partial requests
   inside the app on both targets.
 
-This is the **only** prefix-awareness required; it lives in the app's URL-generation, driven by a
-single env var, and is empty on Fly — so the "app identical across targets" invariant (§8) holds.
+This is the **only** prefix-awareness required; it lives in the app's URL-generation plus the
+uvicorn proxy-headers flag, driven by env vars that are empty/absent on Fly — so the "app identical
+across targets" invariant (§8) holds.
 
 ---
 
@@ -664,7 +694,7 @@ be unit-tested):
 0. **De-risk first:** on Bos-Desktop, manually run a throwaway container `docker run -p 8000:8000
    …`, then `tailscale.exe serve --bg --set-path /smoke 8000`, and hit
    `https://bos-desktop.fish-grouper.ts.net/smoke` from the phone. **Confirm §5.2 (reachability)
-   and the non-stripping path forwarding before writing any template code.** Also confirm the
+   and whether the path forwarding strips the prefix before writing any template code.** Also confirm the
    `--set-path /smoke off` teardown syntax on the installed Tailscale version. If reachability
    fails, resolve §12-Q1 (portproxy shim) before proceeding.
 1. `copier.yml`: add `target`, `tailscale_host`, `tailscale_path` questions (§4.4).
@@ -708,8 +738,12 @@ be unit-tested):
 - ~~Proxying a *port* under a path needs no admin.~~ **FALSE (2026-07-12).** Every serve-config
   write needs Windows admin on Tailscale 1.98.2. Handled by skip-if-registered + one-time elevated
   registration (§4.3).
-- Tailscale forwards the path **unstripped**, and `fastapi>=0.115` (starter pin) strips
-  `root_path` from the route path, so `FastAPI(root_path="/<name>")` routes correctly (§5.4).
+- ~~Tailscale forwards the path unstripped.~~ **FALSE (confirmed empirically 2026-07-12).**
+  Tailscale **strips** the `/<name>` prefix before proxying. `FastAPI(root_path="/<name>")` still
+  routes correctly either way, because Starlette's `get_route_path()` only strips `root_path` from
+  the incoming path when the path actually carries it (§5.4) — but `root_path` is required for
+  correct `url_for()`/redirect output, and uvicorn needs `--proxy-headers` for `url_for()` to emit
+  `https://` links.
 - The shared host's landing page at `/` is already served (Calibre task) — the prerequisite for
   adding sibling paths.
 - `--set-path <path> off` is the correct teardown form — **CONFIRMED 2026-07-12** (`tailscale serve

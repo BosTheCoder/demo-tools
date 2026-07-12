@@ -113,7 +113,7 @@ cd job-tracker && just deploy
 # → https://bos-desktop.fish-grouper.ts.net/job-tracker
 ```
 
-The app image, `Dockerfile`, and app code are **identical** across targets. The only difference is one env var — `ROOT_PATH` — which is empty on Fly (served at `/`) and `/<name>` on local (served under a path prefix, because Tailscale forwards the path without stripping it). Build URLs from `request.url_for(...)` / `request.scope["root_path"]` and the same code works on both.
+The app image, `Dockerfile`, and app code are **identical** across targets. The only difference is one env var — `ROOT_PATH` — which is empty on Fly (served at `/`) and `/<name>` on local. `ROOT_PATH` keeps `request.url_for(...)` / `request.scope["root_path"]`-built URLs prefixed so the same code works on both. Note: `tailscale serve --set-path /<name>` **strips** the prefix before proxying, so the app runs uvicorn with `--proxy-headers` (so `url_for` emits `https://`, not mixed-content `http://`) and serves static via a route rather than a `StaticFiles` mount (a mount only matches the full, unstripped path).
 
 Both `infra/fly/` and `infra/local/` are generated into **every** project, so switching is one value: edit `target:` in `.demo-template-version` (or `DEMO_TARGET=fly just deploy` for a one-off), then `just deploy`. The same `just` verbs dispatch to whichever target is active — no `-local` variants.
 
