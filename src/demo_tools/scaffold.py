@@ -8,6 +8,7 @@ from copier import run_copy
 
 from ._resources import (
     DEFAULT_DOMAIN,
+    DEFAULT_TAILSCALE_HOST,
     TEMPLATE_DIR,
     TEMPLATE_GIT_URL,
     TEMPLATE_SUBDIR,
@@ -15,12 +16,28 @@ from ._resources import (
 from .stacks import get_scaffolder
 
 
-def scaffold_demo(stack: str, name: str, target: Path, profile: str = "demo") -> None:
-    """Scaffold app + overlay infra + git init + initial commit."""
+def scaffold_demo(
+    stack: str,
+    name: str,
+    target: Path,
+    profile: str = "demo",
+    *,
+    deploy_target: str = "fly",
+    tailscale_path: str | None = None,
+) -> None:
+    """Scaffold app + overlay infra + git init + initial commit.
+
+    ``deploy_target`` picks the default `just` dispatch target ("fly" or
+    "local"); both ``infra/`` sets are always generated so graduation is a flip.
+    ``tailscale_path`` overrides the local URL path prefix (defaults to /<name>).
+    """
     target.mkdir(parents=True, exist_ok=True)
 
     scaffolder = get_scaffolder(stack)
     meta = scaffolder.scaffold(target, name)
+
+    ts_host = DEFAULT_TAILSCALE_HOST
+    ts_path = tailscale_path or f"/{name}"
 
     run_copy(
         src_path=str(TEMPLATE_DIR),
@@ -32,6 +49,9 @@ def scaffold_demo(stack: str, name: str, target: Path, profile: str = "demo") ->
             "internal_port": meta["internal_port"],
             "domain_base": DEFAULT_DOMAIN,
             "profile": profile,
+            "target": deploy_target,
+            "tailscale_host": ts_host,
+            "tailscale_path": ts_path,
         },
         defaults=True,
         unsafe=True,
@@ -56,6 +76,9 @@ def scaffold_demo(stack: str, name: str, target: Path, profile: str = "demo") ->
             "internal_port": meta["internal_port"],
             "domain_base": DEFAULT_DOMAIN,
             "profile": profile,
+            "target": deploy_target,
+            "tailscale_host": ts_host,
+            "tailscale_path": ts_path,
         }))
 
     _git_init_and_commit(target)

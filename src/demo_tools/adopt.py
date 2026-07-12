@@ -8,6 +8,7 @@ from copier import run_copy
 
 from ._resources import (
     DEFAULT_DOMAIN,
+    DEFAULT_TAILSCALE_HOST,
     TEMPLATE_DIR,
     TEMPLATE_GIT_URL,
     TEMPLATE_SUBDIR,
@@ -54,12 +55,17 @@ def overlay_infra(
     stateful: bool,
     internal_port: int,
     profile: str = "demo",
+    deploy_target: str = "fly",
+    tailscale_path: str | None = None,
 ) -> None:
     """Apply the Copier infra overlay onto an existing dockerized repo.
 
     Skips files that already exist (existing Dockerfile, package.json, app code,
     etc. are preserved). Only adds the missing infra layer: justfile, fly.toml,
-    infra/fly/*.sh, .demo-template-version, etc.
+    infra/fly/*.sh, infra/local/*.sh, .demo-template-version, etc.
+
+    ``deploy_target`` sets the default `just` dispatch target; ``tailscale_path``
+    overrides the local URL path prefix (defaults to /<name>).
     """
     if not (repo / "Dockerfile").exists():
         raise FileNotFoundError(
@@ -67,6 +73,9 @@ def overlay_infra(
             "`adopt` is for existing dockerized repos. "
             "Use `demo-init <stack> <name>` to scaffold a new demo."
         )
+
+    ts_host = DEFAULT_TAILSCALE_HOST
+    ts_path = tailscale_path or f"/{name}"
 
     run_copy(
         src_path=str(TEMPLATE_DIR),
@@ -78,6 +87,9 @@ def overlay_infra(
             "internal_port": internal_port,
             "domain_base": DEFAULT_DOMAIN,
             "profile": profile,
+            "target": deploy_target,
+            "tailscale_host": ts_host,
+            "tailscale_path": ts_path,
         },
         defaults=True,
         unsafe=True,
@@ -98,4 +110,7 @@ def overlay_infra(
             "internal_port": internal_port,
             "domain_base": DEFAULT_DOMAIN,
             "profile": profile,
+            "target": deploy_target,
+            "tailscale_host": ts_host,
+            "tailscale_path": ts_path,
         }))

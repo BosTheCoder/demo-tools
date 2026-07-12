@@ -41,6 +41,26 @@ profile:
     - service
   default: demo
 
+target:
+  type: str
+  help: "Deploy target: fly (cloud) | local (always-on container exposed via Tailscale)"
+  choices:
+    - fly
+    - local
+  default: fly            # backward-compatible: existing behaviour unchanged
+
+tailscale_host:
+  type: str
+  help: "MagicDNS name of the machine that runs the container + Tailscale"
+  default: "bos-desktop.fish-grouper.ts.net"
+  when: "{{ target == 'local' }}"
+
+tailscale_path:
+  type: str
+  help: "URL path prefix under the shared Tailscale host (Tailscale does NOT strip it; the app is served here)"
+  default: "/{{ name }}"
+  when: "{{ target == 'local' }}"
+
 # Files Copier should not copy into rendered demos.
 # IMPORTANT: this list REPLACES Copier's built-in default exclude list (it does
 # not extend it), so we must include the defaults too — otherwise copier.yml

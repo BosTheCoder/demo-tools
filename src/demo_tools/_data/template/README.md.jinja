@@ -3,10 +3,18 @@
 Demo deployed via [demo-tools](https://github.com/BosTheCoder/demo-tools).
 
 - **Stack:** {{ stack }}
+- **Deploy target:** {{ target }}
 - **Local dev:** `just dev`
 - **Deploy:** `just deploy`
+{% if target == "local" -%}
+- **Live URL** (Tailscale, tailnet-only):
+  - https://{{ tailscale_host }}{{ tailscale_path }}
+- **Data:** persists in `./data` on this machine (SQLite). `just destroy` keeps it.
+- **Graduate to Fly:** set `target: fly` in `.demo-template-version`, then `just deploy` (serves at https://{{ name }}.fly.dev).
+{% else -%}
 - **Live URLs:**
   - https://{{ name }}.fly.dev (always works)
   - https://{{ name }}.{{ domain_base }} (requires `*.{{ domain_base }}` wildcard DNS pointing at Fly)
+{% endif -%}
 - **Stop / start / destroy:** `just stop` / `just start` / `just destroy`
 - **Update infra files:** `just sync`

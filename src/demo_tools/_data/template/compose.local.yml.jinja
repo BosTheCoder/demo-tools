@@ -1,0 +1,32 @@
+# MANAGED BY demo-tools — DO NOT EDIT. Run `just sync` to update.
+#
+# Local (Tailscale) target overlay. Applied on top of compose.yml by the
+# infra/local/*.sh scripts: `docker compose -f compose.yml -f compose.local.yml ...`.
+# Adds a restart policy, the base-path env var (ROOT_PATH), a gitignored .env,
+# and a host bind-mount for SQLite. `just dev` uses compose.yml alone, so none
+# of this affects foreground dev.
+{%- if stack == "nextjs-fastapi" %}
+services:
+  web:
+    restart: unless-stopped
+    environment:
+      ROOT_PATH: "{{ tailscale_path }}"   # base path the web app is served under on local
+  api:
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+{% if stateful %}    volumes:
+      - ./data:/data          # bind-mount: SQLite lives on the host, backup-able, gitignored
+{% endif %}{%- else %}
+services:
+  app:
+    restart: unless-stopped
+    environment:
+      ROOT_PATH: "{{ tailscale_path }}"   # e.g. /job-tracker — the app's base path on local
+    env_file:
+      - path: .env
+        required: false
+{% if stateful %}    volumes:
+      - ./data:/data          # bind-mount: SQLite lives on the host, backup-able, gitignored
+{% endif %}{%- endif %}

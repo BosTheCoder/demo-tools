@@ -5,15 +5,26 @@ import typer
 VALID_STACKS = ("nextjs", "nextjs-fastapi", "fastapi", "streamlit", "static", "bare")
 
 
-def _run_scaffold(stack: str, name: str, profile: str) -> None:
+def _run_scaffold(
+    stack: str,
+    name: str,
+    profile: str,
+    target: str = "fly",
+    tailscale_path: str | None = None,
+) -> None:
     from pathlib import Path
     from .scaffold import scaffold_demo
-    target = Path.cwd() / name
-    if target.exists():
-        typer.echo(f"Error: {target} already exists.", err=True)
+    if target == "local" and profile != "demo":
+        typer.echo("Note: --profile only affects Fly; ignored for --target local.")
+    dest = Path.cwd() / name
+    if dest.exists():
+        typer.echo(f"Error: {dest} already exists.", err=True)
         raise typer.Exit(1)
-    scaffold_demo(stack, name, target, profile=profile)
-    typer.echo(f"Scaffolded {name} at {target}")
+    scaffold_demo(
+        stack, name, dest, profile=profile,
+        deploy_target=target, tailscale_path=tailscale_path,
+    )
+    typer.echo(f"Scaffolded {name} at {dest}")
     typer.echo(f"Next: cd {name} && just dev   (or 'just deploy' to ship)")
 
 
@@ -28,9 +39,18 @@ _ADOPT_DEFAULTS = {
 }
 
 
-def _run_adopt(profile: str, stack: str | None = None, yes: bool = False) -> None:
+def _run_adopt(
+    profile: str,
+    stack: str | None = None,
+    yes: bool = False,
+    target: str = "fly",
+    tailscale_path: str | None = None,
+) -> None:
     from pathlib import Path
     from .adopt import detect_stack, overlay_infra
+
+    if target == "local" and profile != "demo":
+        typer.echo("Note: --profile only affects Fly; ignored for --target local.")
 
     repo = Path.cwd()
     if not (repo / "Dockerfile").exists():
@@ -64,7 +84,8 @@ def _run_adopt(profile: str, stack: str | None = None, yes: bool = False) -> Non
     name = repo.name
     stateful, port = _ADOPT_DEFAULTS[stack]
     overlay_infra(repo, name=name, stack=stack, stateful=stateful,
-                  internal_port=port, profile=profile)
+                  internal_port=port, profile=profile,
+                  deploy_target=target, tailscale_path=tailscale_path)
     typer.echo(f"Adopted {name}: infra files added (existing files preserved).")
     typer.echo("Next: review fly.toml, then `just deploy`.")
 
@@ -111,14 +132,32 @@ _PROFILE_OPTION = typer.Option(
 )
 
 
+def _target_option() -> typer.Option:
+    return typer.Option(
+        "fly",
+        "--target",
+        help="fly (cloud) | local (always-on container exposed via Tailscale)",
+    )
+
+
+def _tailscale_path_option() -> typer.Option:
+    return typer.Option(
+        None,
+        "--tailscale-path",
+        help="URL path prefix under the shared Tailscale host (local target; defaults to /<name>).",
+    )
+
+
 @init_app.command("scaffold")
 def scaffold(
     stack: str = typer.Argument(...),
     name: str = typer.Argument(...),
     profile: str = _PROFILE_OPTION,
+    target: str = _target_option(),
+    tailscale_path: str = _tailscale_path_option(),
 ) -> None:
     """Explicit form: demo-init scaffold <stack> <name>."""
-    _run_scaffold(stack, name, profile)
+    _run_scaffold(stack, name, profile, target, tailscale_path)
 
 
 @init_app.command("adopt")
@@ -128,9 +167,12 @@ def adopt(
     yes: bool = typer.Option(
         False, "--yes", "-y", help="Skip the detection-confirm prompt."
     ),
+    target: str = _target_option(),
+    tailscale_path: str = _tailscale_path_option(),
 ) -> None:
     """Overlay infra onto an existing dockerized repo in the current directory."""
-    _run_adopt(profile, stack=stack, yes=yes)
+    _run_adopt(profile, stack=stack, yes=yes, target=target,
+               tailscale_path=tailscale_path)
 
 
 @demo_app.command("list")

@@ -1,0 +1,56 @@
+set shell := ["bash", "-cu"]
+
+# Deploy target, baked at scaffold time. Override for one run: DEMO_TARGET=fly just deploy
+TARGET := env_var_or_default("DEMO_TARGET", "{{ target }}")
+{% raw %}
+# Local development with hot reload
+dev:
+    docker compose up
+
+# Build the Docker image locally to sanity-check
+build:
+    docker compose build
+
+# Deploy to the configured target (Fly, or a local Tailscale-exposed container)
+deploy:
+    bash infra/{{TARGET}}/deploy.sh
+
+# Stop the app (Fly: machines -> ~$0; local: container stopped)
+stop:
+    bash infra/{{TARGET}}/stop.sh
+
+# Start the app after a stop
+start:
+    bash infra/{{TARGET}}/start.sh
+
+# Destroy the deployed app (with confirmation)
+destroy:
+    bash infra/{{TARGET}}/destroy.sh
+
+# Tail app logs
+logs:
+    bash infra/{{TARGET}}/logs.sh
+
+# Open a shell in the running app
+ssh:
+    bash infra/{{TARGET}}/ssh.sh
+
+# Show app status and reachable URLs
+status:
+    bash infra/{{TARGET}}/status.sh
+
+# Open the app URL in a browser
+open:
+    bash infra/{{TARGET}}/open.sh
+
+# Set a secret: just secret KEY=VAL
+secret KV:
+    bash infra/{{TARGET}}/secret.sh "{{KV}}"
+
+# Provision a database (stateful stacks only)
+db-create:
+    bash infra/{{TARGET}}/db-create.sh
+{% endraw %}
+# Pull latest infra improvements from the demo-tools template
+sync:
+    uvx copier update --answers-file .demo-template-version --trust

@@ -99,6 +99,59 @@ cd my-existing-service && demo-init adopt --profile service
 
 ---
 
+## Deploy targets: Fly vs local
+
+Every demo can ship to one of two **targets**. Fly is the default (cloud, public URL). `local` runs the app as a persistent, always-on container on **your own machine** and exposes it over **Tailscale HTTPS** — tailnet-only, costs nothing, and the data never leaves your disk.
+
+```bash
+# Cloud (default) — public on Fly
+demo-init scaffold fastapi job-tracker
+
+# Always-on container on this machine, reachable over Tailscale
+demo-init scaffold fastapi job-tracker --target local
+cd job-tracker && just deploy
+# → https://bos-desktop.fish-grouper.ts.net/job-tracker
+```
+
+The app image, `Dockerfile`, and app code are **identical** across targets. The only difference is one env var — `ROOT_PATH` — which is empty on Fly (served at `/`) and `/<name>` on local (served under a path prefix, because Tailscale forwards the path without stripping it). Build URLs from `request.url_for(...)` / `request.scope["root_path"]` and the same code works on both.
+
+Both `infra/fly/` and `infra/local/` are generated into **every** project, so switching is one value: edit `target:` in `.demo-template-version` (or `DEMO_TARGET=fly just deploy` for a one-off), then `just deploy`. The same `just` verbs dispatch to whichever target is active — no `-local` variants.
+
+| `just <verb>` | Fly | `local` |
+| ------------- | --- | ------- |
+| `deploy`  | create app, deploy, cert | `docker compose up -d --build` + register `tailscale serve --set-path /<name>` |
+| `stop` / `start` | stop / start machines | stop / start the container |
+| `destroy` | destroy app + cert | unregister the serve path + `compose down` (**keeps** `./data`) |
+| `status`  | Fly status + URLs | container state + the tailnet path URL + data dir |
+| `secret KEY=VAL` | `fly secrets set` | upsert into a gitignored `.env` |
+| `db-create` | provision Fly Postgres | N/A — local uses file-based SQLite in `./data` |
+
+**What local requires** (this target only works on Bos-Desktop):
+
+- **Docker Desktop** (WSL2 backend) set to *"Start Docker Desktop when you sign in"* — its `restart: unless-stopped` policy brings the container back after a reboot.
+- **Tailscale** running on the Windows host (it starts as a service, pre-login) with HTTPS certificates enabled.
+- The shared landing page at `/` must already be served (done when the Tailscale HTTPS services were first set up).
+
+**Admin (UAC) is one-time per app.** Registering a Tailscale serve path needs Windows local admin, so the **first** `just deploy` of an app pops one UAC prompt (approve it). Serve config persists, so every deploy/stop/start after that needs **no** admin — `deploy` detects the existing mount and skips the registration. `just destroy` pops one UAC to deregister. (There's no non-admin serve on Windows; if you decline the prompt, `deploy` prints the exact elevated command to run.)
+
+**Accepted caveat — reboot before login.** Docker Desktop starts only *after* you sign in to Windows. Until then the container is down and the `/<name>` path returns **502** (Tailscale itself is up). This is by design, not a bug.
+
+### Graduating local → Fly (and migrating data)
+
+Because both infra sets always exist, moving a local app to Fly is a flip plus a data copy:
+
+1. Set `target: fly` in `.demo-template-version` (or `DEMO_TARGET=fly just deploy` once).
+2. `just deploy` — deploys to Fly, serving at the root of its own hostname. `ROOT_PATH` is empty there, so URLs that were built from `root_path` follow automatically. No app edits.
+3. Migrate the SQLite file (manual — do it while the app is stopped to avoid a torn copy):
+   ```bash
+   # local → Fly
+   fly ssh sftp shell -a <name>          # then put ./data/<db>.sqlite into /data
+   # Fly → local
+   fly ssh sftp get /data/<db>.sqlite ./data/<db>.sqlite && just deploy
+   ```
+
+---
+
 ## Day-to-day commands
 
 Each scaffolded demo ships with a `justfile` that wraps the platform calls. From inside a demo directory:
@@ -182,12 +235,12 @@ Two-layer model — clean boundary between what the upstream scaffolders own and
 │                                                              │   our own FastAPI / Streamlit starters
 ├──────────────────────────────────────────────────────────────┤
 │  Infra overlay (this repo)                                   │
-│  Dockerfile + fly.toml + compose.yml + justfile +            │ ← Copier template, swappable per platform
-│  infra/fly/*.sh                                              │
+│  Dockerfile + fly.toml + compose.yml + justfile +            │ ← Copier template, swappable per target
+│  infra/fly/*.sh + infra/local/*.sh                           │
 └──────────────────────────────────────────────────────────────┘
 ```
 
-To switch deploy platforms later (e.g. Hetzner + Coolify, or self-hosted k3s), drop a sibling `infra/<platform>/` directory with the same script names and set `DEMO_PLATFORM=<platform>`. The `justfile`, `Dockerfile`, and app code are platform-portable.
+The `justfile` dispatches every verb to `infra/<target>/<verb>.sh`, where `<target>` is `DEMO_TARGET` (baked at scaffold time from the `target` answer, overridable per-run). Two targets ship today — `fly` and `local` (see [Deploy targets](#deploy-targets-fly-vs-local)). To add another later (e.g. Hetzner + Coolify, or self-hosted k3s), drop a sibling `infra/<target>/` directory with the same script names and set `DEMO_TARGET=<target>`. The `justfile`, `Dockerfile`, and app code are target-portable.
 
 ---
 
