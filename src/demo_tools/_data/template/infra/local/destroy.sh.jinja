@@ -8,6 +8,10 @@ case "$ans" in
     *) echo "Aborted."; exit 0 ;;
 esac
 resolve_ts
-"${TS[@]}" serve --set-path "${TS_PATH}" off || true
+# Unregister the serve path only if it's actually mapped (an admin-gated write).
+if serve_status | grep -qE "(^|[[:space:]])${TS_PATH}[[:space:]]"; then
+  echo "==> Unregistering ${TS_PATH} — approve the Windows UAC prompt."
+  ts_serve_elevated --set-path "${TS_PATH}" off || true
+fi
 "${COMPOSE[@]}" down || true
 echo "Done. Your data dir ./data was KEPT (SQLite lives there). Delete it manually with: rm -rf ./data"

@@ -39,6 +39,30 @@ preflight() {
 # Current `tailscale serve` config (empty string if unavailable).
 serve_status() { "${TS[@]}" serve status 2>/dev/null || true; }
 
+# True when TS_PATH is already served AND points at our container's port.
+# Re-deploys of a registered app hit this and skip the (admin-gated) serve write.
+serve_path_registered() {
+  serve_status | grep -qE "(^|[[:space:]])${TS_PATH}[[:space:]]+proxy[[:space:]]+https?://127\.0\.0\.1:${INTERNAL_PORT}(\b|/|$)"
+}
+
+# True when TS_PATH is served by a DIFFERENT backend (a real conflict, e.g. /calibre).
+serve_path_conflict() {
+  serve_status | grep -qE "(^|[[:space:]])${TS_PATH}[[:space:]]" && ! serve_path_registered
+}
+
+# Writing `tailscale serve` config requires Windows local admin (verified on
+# Tailscale 1.98.x — path AND own-port serves both need it). Everyday deploys of
+# an already-registered app skip this entirely, so admin is a one-time-per-app
+# cost. Run the write elevated via Start-Process (UAC); blocks on approval.
+# Args: the `tailscale serve` arguments (e.g. --bg --set-path /foo 8000).
+TS_WIN='C:\Program Files\Tailscale\tailscale.exe'
+ts_serve_elevated() {
+  local ps_args="'serve'" a
+  for a in "$@"; do ps_args="${ps_args},'${a}'"; done
+  powershell.exe -NoProfile -Command \
+    "Start-Process -FilePath '${TS_WIN}' -ArgumentList @(${ps_args}) -Verb RunAs -Wait"
+}
+
 # True when the app service's container is up (used for friendly hints).
 container_running() {
   [[ -n "$("${COMPOSE[@]}" ps -q "$SVC" 2>/dev/null)" ]]

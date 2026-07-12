@@ -68,16 +68,29 @@ def test_local_lib_carries_host_path_and_port():
 
 def test_local_deploy_registers_tailscale_serve():
     deploy = (_render() / "infra" / "local" / "deploy.sh").read_text()
-    assert "serve --bg --set-path" in deploy
+    assert "--set-path" in deploy
     assert "${TS_PATH}" in deploy
     assert "${INTERNAL_PORT}" in deploy
     assert "up -d --build" in deploy
+    # Skips the admin-gated serve write when the path is already registered
+    # (so everyday re-deploys need no UAC); elevates only on first registration.
+    assert "already registered" in deploy
+    assert "ts_serve_elevated" in deploy
+
+
+def test_local_lib_defines_skip_and_elevation_helpers():
+    lib = (_render() / "infra" / "local" / "_lib.sh").read_text()
+    assert "serve_path_registered()" in lib
+    assert "serve_path_conflict()" in lib
+    assert "ts_serve_elevated()" in lib
+    assert "RunAs" in lib  # elevation via Windows Start-Process
 
 
 def test_local_destroy_unregisters_serve_and_keeps_data():
     destroy = (_render() / "infra" / "local" / "destroy.sh").read_text()
     assert "--set-path" in destroy
     assert "off" in destroy               # `serve --set-path <path> off`
+    assert "ts_serve_elevated" in destroy  # deregister is also admin-gated
     assert "[y/N]" in destroy             # confirmation prompt
     assert "./data" in destroy            # data dir is KEPT
 

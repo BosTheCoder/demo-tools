@@ -1,8 +1,12 @@
 # demo-tools: local / Tailscale deploy target — design
 
 **Date:** 2026-07-10
-**Status:** Draft (routing resolved to **path-based** per Kelvin, 2026-07-10 — see §12; one
-step-0 verification remains)
+**Status:** Implemented + smoke-tested on Bos-Desktop 2026-07-12 (path-based routing per Kelvin,
+2026-07-10 — see §12). **Correction:** the "no admin for path serves" assumption was **false** —
+Tailscale 1.98.2 requires Windows local admin for *every* serve-config write (path AND own-port,
+verified empirically). The feature accommodates this: `deploy` skips the serve write when the path
+is already registered (everyday re-deploys need no admin) and elevates via a UAC prompt only on a
+**first-time** registration or `destroy`. See §4.3, §6, §9, §12.
 **Author:** design session (implementer has NOT seen the originating conversation — this doc is self-contained)
 
 ---
@@ -234,10 +238,17 @@ argument), so a demo-tools app slots in next to `/calibre` under the same front 
   `2026-06-25-tailscale-https-services` task — do **not** invent alternative flags):
   `tailscale serve --bg --set-path /<name> <internal_port>`. The last argument is a **bare port
   number**, not a URL.
-- **No per-app admin.** A port proxy under a path needs **no** Windows admin (verified: the
-  Calibre `/calibre` proxy needed none). The one-time UAC step was solely for serving the
-  landing page's *filesystem path* at `/`, which is a shared-host prerequisite already done
-  (§4.6, §9).
+- **Admin IS required to register a serve path (CORRECTED 2026-07-12).** Empirically, Tailscale
+  1.98.2 rejects *every* serve-config write from a non-admin context — path serves *and* own-port
+  serves alike — with `401: must be a Windows local admin to serve a path`. The pre-existing
+  `/calibre` and `/` mounts persist in `tailscaled` state from a one-time elevated registration;
+  the earlier "no admin" reading was wrong. **Mitigation (what makes this tolerable):** serve
+  config persists across reboots, so an app's path only needs registering **once**. `deploy.sh`
+  therefore skips the serve write when `TS_PATH` already maps to `127.0.0.1:<port>`
+  (`serve_path_registered`), and elevates via `Start-Process -Verb RunAs` (one UAC) only on the
+  first registration. `destroy.sh` elevates once to deregister. Net cost: **one UAC per app
+  lifecycle**, zero for everyday re-deploys/stops/starts. (A scheduled-task-triggered-elevated
+  design was considered for fully-unattended registration and rejected by Kelvin as too heavy.)
 - **Tailscale does NOT strip the path prefix** before forwarding (documented in the Calibre task:
   calibre runs with `--url-prefix /calibre`). The container therefore receives requests at
   `/<name>/...`, so **the app must be base-path aware** — handled cleanly via one env var
@@ -591,7 +602,7 @@ app's construction.
 | Tailscale service not running | `preflight`: `tailscale status` non-zero → "Tailscale is not running on the Windows host." |
 | Docker Desktop not running | `preflight`: `docker info` non-zero → "Docker Desktop is not running." |
 | Path already served (by another app, e.g. `/calibre`) | Before registering, `tailscale serve status` is checked; if `<tailscale_path>` maps to a *different* backend port, error listing the conflict and suggesting `--tailscale-path` at scaffold time. Re-deploying the *same* app is idempotent. |
-| Landing-page `/` filesystem serve needs admin | This is a **shared-host prerequisite already done** (Calibre task, one-time UAC). Adding a demo-tools app under `/<name>` is a **port proxy → no admin**. README notes this so a fresh machine knows the `/` mount must exist first. |
+| Serve registration needs admin | **Every** serve-config write needs Windows admin (Tailscale 1.98.2). `deploy.sh` skips it when the path is already registered; on first registration it elevates via one UAC (`Start-Process -Verb RunAs`). If the UAC is declined or there's no desktop session, it prints the exact elevated command and exits non-zero. |
 | Container not up (`logs`/`ssh`/`status`) | Scripts detect via `docker compose ps` and print "container not running — `just deploy` first" instead of a raw Docker error. |
 | `"Program Files"` space in path | Always quote the explicit `/mnt/c/Program Files/Tailscale/tailscale.exe`; never rely on an unquoted PATH lookup. |
 | Reboot before login | Documented, **accepted** caveat (§6) — container down (502) until Kelvin signs in; Tailscale itself is up. |
@@ -694,22 +705,25 @@ be unit-tested):
 **Assumptions made (documented; low-to-medium risk):**
 - Docker Desktop publishes container ports to Windows `localhost` in Kelvin's config (§5.2) —
   the standard WSL2-backend behaviour, verified present but not end-to-end proven for `serve`.
-- Proxying a *port* under a path (`--set-path /<name> <port>`) needs no admin (verified from the
-  Calibre task — only the landing-page filesystem serve needed one-time UAC).
+- ~~Proxying a *port* under a path needs no admin.~~ **FALSE (2026-07-12).** Every serve-config
+  write needs Windows admin on Tailscale 1.98.2. Handled by skip-if-registered + one-time elevated
+  registration (§4.3).
 - Tailscale forwards the path **unstripped**, and `fastapi>=0.115` (starter pin) strips
   `root_path` from the route path, so `FastAPI(root_path="/<name>")` routes correctly (§5.4).
 - The shared host's landing page at `/` is already served (Calibre task) — the prerequisite for
   adding sibling paths.
-- `--set-path <path> off` is the correct teardown form (confirm during step-0).
+- `--set-path <path> off` is the correct teardown form — **CONFIRMED 2026-07-12** (`tailscale serve
+  --set-path /smoke-local off` removed only that mount; `/` and `/calibre` untouched).
 
 **Remaining must-verify (highest risk):**
 
-1. **The WSL ⇄ Windows ⇄ container reachability (§5.2, step-0).** Confirm on the real machine that
-   `tailscale.exe serve --set-path /smoke 8000` reaches a Docker-Desktop-published
-   `127.0.0.1:8000`, forwards the path unstripped, and that `FastAPI(root_path=...)` routes it.
-   If Docker is ever run rootless / dockerd-in-WSL (not Docker Desktop) or bound only to the WSL
-   IP, we need a `netsh interface portproxy` shim on Windows — decide the fallback then. **This is
-   step 0 of the checklist.**
+1. ~~The WSL ⇄ Windows ⇄ container reachability (§5.2, step-0).~~ **RESOLVED 2026-07-12.** Smoke
+   test on Bos-Desktop passed end-to-end: `demo-init scaffold fastapi smoke-local --target local`
+   → `just deploy` → `https://bos-desktop.fish-grouper.ts.net/smoke-local/` served
+   `{"hello":"world"}` and `/smoke-local/healthz` served `{"ok":true}` with a valid cert, from
+   both WSL `curl` and a **phone on the tailnet**. Docker Desktop published to Windows
+   `127.0.0.1:8000` as assumed — no `netsh portproxy` shim needed. The only surprise was the admin
+   requirement (§4.3), now handled.
 
 **Lower-priority confirmations:** whether `just secret` writing to `.env` is the desired local
 secret story vs a `.env.local`; whether to auto-append `./data/` to `.gitignore` (yes,

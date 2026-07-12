@@ -130,7 +130,9 @@ Both `infra/fly/` and `infra/local/` are generated into **every** project, so sw
 
 - **Docker Desktop** (WSL2 backend) set to *"Start Docker Desktop when you sign in"* — its `restart: unless-stopped` policy brings the container back after a reboot.
 - **Tailscale** running on the Windows host (it starts as a service, pre-login) with HTTPS certificates enabled.
-- The shared landing page at `/` must already be served (a one-time Windows-admin step, done when the Tailscale HTTPS services were first set up). Adding an app under `/<name>` needs **no** admin.
+- The shared landing page at `/` must already be served (done when the Tailscale HTTPS services were first set up).
+
+**Admin (UAC) is one-time per app.** Registering a Tailscale serve path needs Windows local admin, so the **first** `just deploy` of an app pops one UAC prompt (approve it). Serve config persists, so every deploy/stop/start after that needs **no** admin — `deploy` detects the existing mount and skips the registration. `just destroy` pops one UAC to deregister. (There's no non-admin serve on Windows; if you decline the prompt, `deploy` prints the exact elevated command to run.)
 
 **Accepted caveat — reboot before login.** Docker Desktop starts only *after* you sign in to Windows. Until then the container is down and the `/<name>` path returns **502** (Tailscale itself is up). This is by design, not a bug.
 
