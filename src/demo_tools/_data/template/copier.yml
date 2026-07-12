@@ -57,7 +57,7 @@ tailscale_host:
 
 tailscale_path:
   type: str
-  help: "URL path prefix under the shared Tailscale host (Tailscale does NOT strip it; the app is served here)"
+  help: "URL path prefix under the shared Tailscale host (Tailscale strips it before proxying; the app is served here)"
   default: "/{{ name }}"
   when: "{{ target == 'local' }}"
 
