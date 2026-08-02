@@ -13,7 +13,11 @@ if serve_path_conflict; then
 fi
 
 echo "==> Building + starting container (detached)"
-"${COMPOSE[@]}" up -d --build
+# --force-recreate because `up -d --build` alone has been observed leaving the
+# previous container running against the previous image: the new image is built,
+# compose reports "Running", and the deploy silently serves stale code. A redeploy
+# should always run what was just built, and recreating costs about a second.
+"${COMPOSE[@]}" up -d --build --force-recreate
 
 if serve_path_registered; then
   echo "==> Tailscale path ${TS_PATH} already registered — no admin needed."

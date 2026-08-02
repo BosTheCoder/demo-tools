@@ -75,6 +75,30 @@ Run `demo-init` with no arguments to see the six stacks listed below, with examp
 
 ---
 
+## Installable on a phone (PWA)
+
+Every scaffolded demo is installable by default — open it on a phone, **Add to Home Screen**, and it launches full-screen with its own icon. A demo you can only reach by pasting a URL is a demo you don't open.
+
+Scaffolding writes a manifest, a service worker, and a set of icons. Icons are **generated**, not shipped: a monogram of the app's first letter on a colour derived from its name, so a row of installed demos is distinguishable at a glance. No image dependency — the PNGs are written with `zlib` and `struct`.
+
+| Stack            | Installable | How                                                            |
+| ---------------- | ----------- | -------------------------------------------------------------- |
+| `fastapi`        | yes         | app shell + manifest/worker routes at the app root              |
+| `static`         | yes         | assets in `public/`, tags injected into Vite's `index.html`     |
+| `nextjs`         | yes         | App Router file conventions (`manifest.webmanifest`, `apple-icon.png`) |
+| `nextjs-fastapi` | yes         | same as `nextjs`, on the web half                               |
+| `streamlit`      | no          | Streamlit owns the document head; there is no supported hook    |
+| `bare`           | no          | there is no app yet — call `pwa.write_assets()` once there is   |
+
+Two details are load-bearing and handled once in `pwa.py` rather than per stack:
+
+- **Scope.** A service worker can only control URLs at or below the path it was served from. These apps run at `/` on Fly and under `/<name>` behind the local Tailscale proxy, so the worker derives every URL from `self.registration.scope` and the FastAPI manifest keeps `{{ROOT_PATH}}` as a placeholder substituted per request. A worker served from `/static/` could never control the pages it exists to cache.
+- **Caching.** Demo data changes constantly, so `/api/` is never cached and page loads are network-first. The cached shell is an offline fallback, not a speed trick — a stale demo that looks live is worse than one that plainly failed.
+
+The Next.js stacks get a manifest and icons but no service worker: that is enough for the install prompt, and registering one from the App Router needs a client component the scaffolder has no business injecting.
+
+---
+
 ## Profiles: demo vs service
 
 Every demo is scaffolded under a **profile** that bundles its Fly auto-stop economics. Pass `--profile <demo|service>` at scaffold or adopt time:
@@ -239,6 +263,8 @@ Two-layer model — clean boundary between what the upstream scaffolders own and
 │  infra/fly/*.sh + infra/local/*.sh                           │
 └──────────────────────────────────────────────────────────────┘
 ```
+
+**One deliberate exception to "we never touch the app layer":** PWA installability needs assets *inside* the app. Scaffolding adds files to `public/` or `src/app/` and inserts link tags into Vite's `index.html`. It is kept to additions the upstream scaffolders don't own — the Next.js stacks use App Router file conventions rather than patching the generated `layout.tsx`, because a regex edit on somebody else's output breaks silently on their next release. The `index.html` insert is guarded and idempotent.
 
 The `justfile` dispatches every verb to `infra/<target>/<verb>.sh`, where `<target>` is `DEMO_TARGET` (baked at scaffold time from the `target` answer, overridable per-run). Two targets ship today — `fly` and `local` (see [Deploy targets](#deploy-targets-fly-vs-local)). To add another later (e.g. Hetzner + Coolify, or self-hosted k3s), drop a sibling `infra/<target>/` directory with the same script names and set `DEMO_TARGET=<target>`. The `justfile`, `Dockerfile`, and app code are target-portable.
 

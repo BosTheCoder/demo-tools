@@ -4,6 +4,8 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
+from .. import pwa
+
 
 def scaffold(target: Path, name: str) -> dict[str, Any]:
     app_dir = target / "app"
@@ -35,5 +37,7 @@ def scaffold(target: Path, name: str) -> dict[str, Any]:
         "const nextConfig = { output: 'standalone' };\n"
         "export default nextConfig;\n"
     )
+
+    pwa.write_next_app_assets(app_dir, name)
 
     return {"stack": "nextjs", "stateful": False, "internal_port": 3000}

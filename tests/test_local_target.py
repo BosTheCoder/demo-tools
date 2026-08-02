@@ -236,22 +236,23 @@ def test_fastapi_starter_serves_static_via_route_not_mount():
 
     app = _load_starter_app("/tmp-demo")
     static_dir = STARTERS_DIR / "fastapi" / "static"
-    static_dir.mkdir(exist_ok=True)
-    asset = static_dir / "app.css"
+    # The starter ships real assets here now (app shell + PWA), so this writes
+    # a scratch file under a name that cannot collide with one of them and
+    # leaves the directory in place.
+    asset = static_dir / "_probe.css"
     asset.write_text("body{color:red}")
     try:
         client = TestClient(app)
         # Realistic stripped-prefix request (what Tailscale actually sends).
-        resp = client.get("/static/app.css")
+        resp = client.get("/static/_probe.css")
         assert resp.status_code == 200
         assert resp.text == "body{color:red}"
         # Path traversal outside STATIC_DIR must not be servable.
         assert client.get("/static/../main.py").status_code in (404, 400)
         # url_for still emits the correctly-prefixed URL for the browser.
-        assert app.url_path_for("static", path="app.css") == "/static/app.css"
+        assert app.url_path_for("static", path="_probe.css") == "/static/_probe.css"
     finally:
         asset.unlink()
-        static_dir.rmdir()
 
 
 # --- scaffold / adopt / CLI threading ---------------------------------------

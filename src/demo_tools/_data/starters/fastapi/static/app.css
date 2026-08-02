@@ -1,0 +1,30 @@
+:root {
+  color-scheme: light dark;
+  --bg: #ffffff;
+  --fg: #1f2328;
+  --muted: #616a75;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #16181c;
+    --fg: #e6e8eb;
+    --muted: #9aa3ad;
+  }
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  background: var(--bg);
+  color: var(--fg);
+  font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  /* Installed to a home screen the page runs full-bleed, under the notch. */
+  padding: env(safe-area-inset-top) 24px env(safe-area-inset-bottom);
+}
+
+main { max-width: 32rem; }
+h1 { font-size: 1.5rem; margin: 0 0 .5rem; }
+p { color: var(--muted); margin: 0; }

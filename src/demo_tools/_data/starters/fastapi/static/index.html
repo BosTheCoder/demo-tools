@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>app</title>
+
+<!-- Every asset URL goes through {{ROOT_PATH}}, which main.py substitutes per
+     request. It is "" on Fly and "/<name>" behind the local Tailscale proxy;
+     a hard-coded "/static/..." would resolve to the tailnet host root and miss
+     the app entirely. -->
+<link rel="manifest" href="{{ROOT_PATH}}/manifest.webmanifest">
+<link rel="apple-touch-icon" href="{{ROOT_PATH}}/static/icon-192.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="stylesheet" href="{{ROOT_PATH}}/static/app.css">
+</head>
+<body>
+
+<main>
+  <h1>It works</h1>
+  <p>Replace this page with the app. It is already installable — open it on a
+     phone and choose <em>Add to Home Screen</em>.</p>
+</main>
+
+<script>
+  window.APP_BASE = "{{ROOT_PATH}}";
+  // Registration failure is non-fatal: without it the app still runs, it just
+  // loses its offline fallback. The explicit scope is what lets a worker served
+  // from the app root control the whole app.
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", function () {
+      navigator.serviceWorker
+        .register("{{ROOT_PATH}}/sw.js", { scope: "{{ROOT_PATH}}/" })
+        .catch(function () {});
+    });
+  }
+</script>
+</body>
+</html>

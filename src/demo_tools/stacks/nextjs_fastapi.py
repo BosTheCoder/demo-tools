@@ -5,6 +5,7 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
+from .. import pwa
 from .._resources import STARTERS_DIR
 
 STARTER = STARTERS_DIR / "nextjs-fastapi"
@@ -52,6 +53,8 @@ def scaffold(target: Path, name: str) -> dict[str, Any]:
     # Overlay our Dockerfile (Copier will not touch web/ or api/ subdirs).
     shutil.copy(STARTER / "web" / "Dockerfile", web_dir / "Dockerfile")
     _render_fly_toml(web_dir, name, role="web")
+
+    pwa.write_next_app_assets(web_dir, name)
 
     return {"stack": "nextjs-fastapi", "stateful": True, "internal_port": 3000}
 
