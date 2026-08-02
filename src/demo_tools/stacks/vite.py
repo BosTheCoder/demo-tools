@@ -27,7 +27,7 @@ def scaffold(target: Path, name: str) -> dict[str, Any]:
     pwa.write_assets(app_dir / "public", name)
     _make_installable(app_dir / "index.html")
 
-    return {"stack": "static", "stateful": False, "internal_port": 80}
+    return {"stack": "vite", "stateful": False, "internal_port": 80}
 
 
 def _make_installable(index_html: Path) -> None:

@@ -24,8 +24,8 @@ COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
 EXPOSE {{ internal_port }}
 CMD ["node", "server.js"]
-{%- elif stack == "static" %}
-# NOTE: nginx listens on port 80 by default. The static scaffolder (Task 4.4)
+{%- elif stack == "vite" %}
+# NOTE: nginx listens on port 80 by default. The vite scaffolder
 # must pass internal_port=80 so this Dockerfile, fly.toml, and compose.yml
 # stay in agreement. If you change the port, also reconfigure nginx to listen
 # on the new port.

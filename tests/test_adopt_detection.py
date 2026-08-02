@@ -17,9 +17,9 @@ def test_detects_nextjs(tmp_path):
     assert detect_stack(tmp_path) == "nextjs"
 
 
-def test_detects_static_vite(tmp_path):
+def test_detects_vite(tmp_path):
     _write_pkg(tmp_path / "package.json", {"react": "^18"}, {"vite": "^5"})
-    assert detect_stack(tmp_path) == "static"
+    assert detect_stack(tmp_path) == "vite"
 
 
 def test_detects_fastapi(tmp_path):

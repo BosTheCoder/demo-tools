@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# MANAGED BY demo-tools — DO NOT EDIT. Run `just sync` to update.
+# Shared helpers for the GitHub Pages target.
+set -euo pipefail
+
+APP="{{ name }}"
+STACK="{{ stack }}"
+PUBLISH_MODE="{{ publish_mode }}"   # root = Pages serves main | branch = build output -> gh-pages
+DOMAIN="{{ name }}.{{ domain_base }}"
+PAGES_BRANCH="gh-pages"
+BUILD_DIR="dist"
+
+# Every verb needs the repo identity; resolve it once, from the git remote.
+repo_slug() {
+  gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null
+}
+
+preflight() {
+  command -v gh >/dev/null 2>&1 || {
+    echo "ERROR: the GitHub CLI (gh) is required for the pages target." >&2
+    echo "  https://cli.github.com  then: gh auth login" >&2
+    exit 1
+  }
+  gh auth status >/dev/null 2>&1 || {
+    echo "ERROR: gh is not authenticated. Run: gh auth login" >&2
+    exit 1
+  }
+  git rev-parse --git-dir >/dev/null 2>&1 || {
+    echo "ERROR: not a git repository." >&2
+    exit 1
+  }
+  SLUG="$(repo_slug || true)"
+  if [[ -z "${SLUG:-}" ]]; then
+    echo "ERROR: no GitHub repo is linked to this directory." >&2
+    echo "Create one first:" >&2
+    echo "  gh repo create ${APP} --public --source=. --remote=origin --push" >&2
+    exit 1
+  fi
+  export SLUG
+}
+
+pages_api() { gh api "repos/${SLUG}/pages" "$@" 2>/dev/null; }
+
+pages_url() {
+  local u
+  u="$(pages_api --jq '.html_url' || true)"
+  [[ -n "$u" ]] && echo "$u" || echo "https://${DOMAIN}"
+}

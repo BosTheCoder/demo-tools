@@ -6,6 +6,7 @@ from pathlib import Path
 import yaml
 from copier import run_copy
 
+from .targets import NO_DOCKERFILE_STACKS, check_target_stack, publish_mode
 from ._resources import (
     DEFAULT_DOMAIN,
     DEFAULT_TAILSCALE_HOST,
@@ -24,12 +25,12 @@ def detect_stack(repo: Path) -> str | None:
         if "next" in deps:
             return "nextjs"
         if "vite" in deps or "@vitejs/plugin-react" in deps:
-            return "static"
+            return "vite"
         if "astro" in deps:
-            return "static"
-        # Plain React/Svelte without Vite — treat as static still
+            return "vite"
+        # Plain React/Svelte without Vite — still a bundled SPA
         if "react" in deps or "svelte" in deps or "vue" in deps:
-            return "static"
+            return "vite"
 
     requirements = repo / "requirements.txt"
     pyproject = repo / "pyproject.toml"
@@ -67,7 +68,7 @@ def overlay_infra(
     ``deploy_target`` sets the default `just` dispatch target; ``tailscale_path``
     overrides the local URL path prefix (defaults to /<name>).
     """
-    if not (repo / "Dockerfile").exists():
+    if deploy_target != "pages" and not (repo / "Dockerfile").exists():
         raise FileNotFoundError(
             f"No Dockerfile found in {repo}. "
             "`adopt` is for existing dockerized repos. "
@@ -76,6 +77,11 @@ def overlay_infra(
 
     ts_host = DEFAULT_TAILSCALE_HOST
     ts_path = tailscale_path or f"/{name}"
+    derived = {
+        "dockerised": stack not in NO_DOCKERFILE_STACKS,
+        "pages_ok": _pages_ok(stack),
+        "publish_mode": publish_mode(stack),
+    }
 
     run_copy(
         src_path=str(TEMPLATE_DIR),
@@ -90,6 +96,7 @@ def overlay_infra(
             "target": deploy_target,
             "tailscale_host": ts_host,
             "tailscale_path": ts_path,
+            **derived,
         },
         defaults=True,
         unsafe=True,
@@ -113,4 +120,13 @@ def overlay_infra(
             "target": deploy_target,
             "tailscale_host": ts_host,
             "tailscale_path": ts_path,
+            **derived,
         }))
+
+
+def _pages_ok(stack: str) -> bool:
+    try:
+        check_target_stack("pages", stack)
+    except ValueError:
+        return False
+    return True

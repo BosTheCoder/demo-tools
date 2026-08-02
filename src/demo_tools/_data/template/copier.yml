@@ -9,13 +9,14 @@ name:
 
 stack:
   type: str
-  help: "Which stack: nextjs | nextjs-fastapi | fastapi | streamlit | static | bare"
+  help: "Which stack: nextjs | nextjs-fastapi | fastapi | streamlit | vite | html | bare"
   choices:
     - nextjs
     - nextjs-fastapi
     - fastapi
     - streamlit
-    - static
+    - vite
+    - html
     - bare
 
 stateful:
@@ -43,11 +44,32 @@ profile:
 
 target:
   type: str
-  help: "Deploy target: fly (cloud) | local (always-on container exposed via Tailscale)"
+  help: "Deploy target: fly (cloud) | local (Tailscale container) | pages (GitHub Pages)"
   choices:
     - fly
     - local
+    - pages
   default: fly            # backward-compatible: existing behaviour unchanged
+
+# Derived by the CLI from the stack (see demo_tools/targets.py) so the template
+# never has to duplicate the compatibility rules.
+dockerised:
+  type: bool
+  help: "Does this stack build a Docker image? (false for html)"
+  default: true
+
+pages_ok:
+  type: bool
+  help: "Can this stack be served as static files by GitHub Pages?"
+  default: false
+
+publish_mode:
+  type: str
+  help: "How pages publishes: root (Pages serves main) | branch (build output pushed to gh-pages)"
+  choices:
+    - root
+    - branch
+  default: branch
 
 tailscale_host:
   type: str
@@ -82,3 +104,7 @@ _exclude:
 # `just dev` at the top level.
 _tasks:
   - "{% if stack == 'nextjs-fastapi' %}rm -f Dockerfile fly.toml{% endif %}"
+  # Only ship infra a stack can actually use. A directory of scripts that can
+  # never run is worse than no directory: it reads as a supported path.
+  - "{% if not pages_ok %}rm -rf infra/pages{% endif %}"
+  - "{% if not dockerised %}rm -rf infra/fly infra/local fly.toml Dockerfile .dockerignore compose.yml compose.local.yml .github{% endif %}"

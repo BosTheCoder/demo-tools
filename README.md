@@ -54,7 +54,7 @@ just dev          # local docker compose
 just deploy       # ship to Fly + ensure cert
 ```
 
-Run `demo-init` with no arguments to see the six stacks listed below, with example invocations.
+Run `demo-init` with no arguments to see the seven stacks listed below, with example invocations.
 
 > Want to run without a global install? See [Running a local copy](#running-a-local-copy) for the `uv run` and snapshot options, plus editable-install caveats.
 
@@ -68,7 +68,8 @@ Run `demo-init` with no arguments to see the six stacks listed below, with examp
 | `nextjs-fastapi` | 3000/8000 | SQLite + volume on api     | `create-next-app` (web) + FastAPI starter (api)      |
 | `fastapi`        | 8000      | SQLite + volume            | Minimal FastAPI starter, uvicorn entrypoint          |
 | `streamlit`      | 8501      | SQLite + volume            | Minimal Streamlit starter                            |
-| `static`         | 80        | none                       | `create-vite` (React + TS) → multi-stage nginx       |
+| `vite`           | 80        | none                       | `create-vite` (React + TS) → multi-stage nginx       |
+| `html`           | 8000      | none                       | Plain `index.html`/`app.js`/`app.css`, no build step |
 | `bare`           | any       | none                       | Empty `app/`, you (or Claude) write the Dockerfile   |
 
 `nextjs-fastapi` deploys as two apps: `<name>-web` (public, Next.js) and `<name>-api` (`.internal` only, FastAPI). The web app gets the public hostname; the api is reachable from web at `http://<name>-api.internal:8000`.
@@ -84,7 +85,8 @@ Scaffolding writes a manifest, a service worker, and a set of icons. Icons are *
 | Stack            | Installable | How                                                            |
 | ---------------- | ----------- | -------------------------------------------------------------- |
 | `fastapi`        | yes         | app shell + manifest/worker routes at the app root              |
-| `static`         | yes         | assets in `public/`, tags injected into Vite's `index.html`     |
+| `vite`           | yes         | assets in `public/`, tags injected into Vite's `index.html`     |
+| `html`           | yes         | assets beside `index.html`; every URL relative so it installs at a subpath |
 | `nextjs`         | yes         | App Router file conventions (`manifest.webmanifest`, `apple-icon.png`) |
 | `nextjs-fastapi` | yes         | same as `nextjs`, on the web half                               |
 | `streamlit`      | no          | Streamlit owns the document head; there is no supported hook    |
@@ -110,10 +112,10 @@ Every demo is scaffolded under a **profile** that bundles its Fly auto-stop econ
 
 ```bash
 # Throwaway demo (default)
-demo-init scaffold static my-experiment
+demo-init scaffold vite my-experiment
 
 # Always-on service
-demo-init scaffold static my-portfolio --profile service
+demo-init scaffold vite my-portfolio --profile service
 
 # Adopt an existing always-on Fly app
 cd my-existing-service && demo-init adopt --profile service
@@ -123,9 +125,9 @@ cd my-existing-service && demo-init adopt --profile service
 
 ---
 
-## Deploy targets: Fly vs local
+## Deploy targets
 
-Every demo can ship to one of two **targets**. Fly is the default (cloud, public URL). `local` runs the app as a persistent, always-on container on **your own machine** and exposes it over **Tailscale HTTPS** — tailnet-only, costs nothing, and the data never leaves your disk.
+Every demo ships to one of three **targets**. Fly is the default (cloud, public URL). `local` runs the app as a persistent, always-on container on **your own machine** and exposes it over **Tailscale HTTPS** — tailnet-only, costs nothing, and the data never leaves your disk. `pages` publishes to **GitHub Pages** for apps that are just files — no container, no server, no cold start.
 
 ```bash
 # Cloud (default) — public on Fly
@@ -139,7 +141,50 @@ cd job-tracker && just deploy
 
 The app image, `Dockerfile`, and app code are **identical** across targets. The only difference is one env var — `ROOT_PATH` — which is empty on Fly (served at `/`) and `/<name>` on local. `ROOT_PATH` keeps `request.url_for(...)` / `request.scope["root_path"]`-built URLs prefixed so the same code works on both. Note: `tailscale serve --set-path /<name>` **strips** the prefix before proxying, so the app runs uvicorn with `--proxy-headers` (so `url_for` emits `https://`, not mixed-content `http://`) and serves static via a route rather than a `StaticFiles` mount (a mount only matches the full, unstripped path).
 
-Both `infra/fly/` and `infra/local/` are generated into **every** project, so switching is one value: edit `target:` in `.demo-template-version` (or `DEMO_TARGET=fly just deploy` for a one-off), then `just deploy`. The same `just` verbs dispatch to whichever target is active — no `-local` variants.
+Both `infra/fly/` and `infra/local/` are generated into every project that can use them, so switching is one value: edit `target:` in `.demo-template-version` (or `DEMO_TARGET=fly just deploy` for a one-off), then `just deploy`. The same `just` verbs dispatch to whichever target is active — no `-local` variants.
+
+
+### `pages` — GitHub Pages
+
+For demos whose output is files. No container, no server, no cold start, no cost.
+
+```bash
+demo-init scaffold html link-tool --target pages
+cd link-tool
+gh repo create link-tool --public --source=. --remote=origin --push
+just deploy
+# → https://bosthecoder.github.io/link-tool/
+```
+
+**Two publish paths**, picked from the stack:
+
+| Stack  | `just deploy` does | Pages source |
+| ------ | ------------------ | ------------ |
+| `html` | pushes the branch — no build step, so the repo root *is* the site | `main` `/` |
+| `vite` | `npm run build`, then pushes `dist/` to `gh-pages` | `gh-pages` `/` |
+
+Forcing `html` through a branch would mean maintaining a byte-copy of `main`, so it doesn't.
+
+**Compatibility is checked before any files are written.** `pages` accepts `html`, `vite` and `bare`. `fastapi`, `streamlit` and `nextjs-fastapi` need a running server and are refused. `nextjs` is refused too — it *can* export statically, but that silently disables SSR, API routes and image optimisation, so it fails later rather than now. `infra/pages/` is only generated for stacks that can use it: a directory of scripts that can never run reads as a supported path.
+
+**Verbs that have no analogue say so** rather than doing nothing quietly:
+
+| `just <verb>` | On `pages` |
+| ------------- | ---------- |
+| `deploy`      | Publish, then ensure Pages config + `CNAME` via `gh api` |
+| `status`      | Pages state, source, URL, custom domain, **HTTPS certificate state** |
+| `logs`        | Pages build history — a CDN has no request log to tail |
+| `destroy`     | Disables Pages (confirmed). Leaves the repo alone. |
+| `stop`/`start`| Exit 0 with a note: always on, nothing to stop |
+| `ssh`, `db-create` | Exit non-zero — no machine, no database |
+| `secret`      | **Exit non-zero.** See below. |
+
+**`just secret` deliberately fails here.** On Fly it sets a server-side value the client never sees. Pages has no server, so anything the page can read, a visitor can read — a `.env` written here would publish a credential to a CDN while looking like it was hidden. The error distinguishes the two cases: public config (an API base URL, a publishable key) belongs in the source, because it will be visible either way; a real credential needs a server, which means `DEMO_TARGET=fly just deploy`.
+
+This matters because static pages calling external services is the *normal* case for this target, not an edge case.
+
+**Custom domain.** Put the hostname in a `CNAME` file at the repo root; `just deploy` picks it up and registers it. DNS is manual: `CNAME <sub> → <user>.github.io`, **DNS-only** (grey cloud on Cloudflare — proxying breaks GitHub's certificate issuance). The certificate can take up to an hour on first setup; `just status` shows its state, which is the usual answer to "why does http work but https doesn't?".
+
 
 | `just <verb>` | Fly | `local` |
 | ------------- | --- | ------- |
@@ -178,7 +223,7 @@ Because both infra sets always exist, moving a local app to Fly is a flip plus a
 
 ## Day-to-day commands
 
-Each scaffolded demo ships with a `justfile` that wraps the platform calls. From inside a demo directory. The table below describes the default **Fly** target; under `--target local` the same verbs act on the local container + Tailscale serve instead — see [Deploy targets: Fly vs local](#deploy-targets-fly-vs-local).
+Each scaffolded demo ships with a `justfile` that wraps the platform calls. From inside a demo directory. The table below describes the default **Fly** target; under `--target local` the same verbs act on the local container + Tailscale serve instead — see [Deploy targets](#deploy-targets).
 
 | `just <verb>`           | What it does                                                            |
 | ----------------------- | ----------------------------------------------------------------------- |
@@ -266,7 +311,7 @@ Two-layer model — clean boundary between what the upstream scaffolders own and
 
 **One deliberate exception to "we never touch the app layer":** PWA installability needs assets *inside* the app. Scaffolding adds files to `public/` or `src/app/` and inserts link tags into Vite's `index.html`. It is kept to additions the upstream scaffolders don't own — the Next.js stacks use App Router file conventions rather than patching the generated `layout.tsx`, because a regex edit on somebody else's output breaks silently on their next release. The `index.html` insert is guarded and idempotent.
 
-The `justfile` dispatches every verb to `infra/<target>/<verb>.sh`, where `<target>` is `DEMO_TARGET` (baked at scaffold time from the `target` answer, overridable per-run). Two targets ship today — `fly` and `local` (see [Deploy targets](#deploy-targets-fly-vs-local)). To add another later (e.g. Hetzner + Coolify, or self-hosted k3s), drop a sibling `infra/<target>/` directory with the same script names and set `DEMO_TARGET=<target>`. The `justfile`, `Dockerfile`, and app code are target-portable.
+The `justfile` dispatches every verb to `infra/<target>/<verb>.sh`, where `<target>` is `DEMO_TARGET` (baked at scaffold time from the `target` answer, overridable per-run). Three targets ship today — `fly`, `local` and `pages` (see [Deploy targets](#deploy-targets)). To add another later (e.g. Hetzner + Coolify, or self-hosted k3s), drop a sibling `infra/<target>/` directory with the same script names and set `DEMO_TARGET=<target>`. The `justfile`, `Dockerfile`, and app code are target-portable.
 
 ---
 
@@ -342,7 +387,7 @@ the mode that matches what you're doing:
 
 | Use case | Command | Reflects local edits? |
 | -------- | ------- | --------------------- |
-| **Iterating / testing changes** (recommended) | `uv run demo-init scaffold static foo` | Always — runs straight from source via the project venv + `uv.lock`. Nothing installed globally. |
+| **Iterating / testing changes** (recommended) | `uv run demo-init scaffold vite foo` | Always — runs straight from source via the project venv + `uv.lock`. Nothing installed globally. |
 | **Using the tool day-to-day while tweaking it** | `uv tool install --editable .` | Live, for `.py` code *and* the bundled `_data/` templates/starters (their paths resolve relative to the source file). Reinstall only when **dependencies**, **entry points**, or the **Python constraint** change. |
 | **Pinning a local snapshot** | `uv tool install --reinstall --from . demo-tools` | No — freezes current state; re-run with `--reinstall` to update. |
 

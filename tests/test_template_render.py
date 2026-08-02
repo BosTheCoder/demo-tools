@@ -7,6 +7,7 @@ import pytest
 from copier import run_copy
 
 from demo_tools._resources import TEMPLATE_DIR as TEMPLATE
+from demo_tools.scaffold import _target_flags
 
 
 def _render(stack: str, **overrides) -> Path:
@@ -17,6 +18,9 @@ def _render(stack: str, **overrides) -> Path:
         "stateful": stack in {"fastapi", "nextjs-fastapi", "streamlit"},
         "internal_port": overrides.get("internal_port", 3000),
         "domain_base": "demos.buildwithbos.com",
+        # Derived exactly as scaffold.py does, so the tests exercise the real
+        # stack -> template-flag mapping rather than a hand-kept copy.
+        **_target_flags(stack),
     }
     data.update(overrides)
     run_copy(src_path=str(TEMPLATE), dst_path=str(tmp), data=data,
@@ -32,7 +36,7 @@ def test_bare_renders_dockerfile():
     assert "TODO" in content  # bare stack ships with a placeholder
 
 
-@pytest.mark.parametrize("stack", ["bare", "nextjs", "static", "fastapi", "streamlit"])
+@pytest.mark.parametrize("stack", ["bare", "nextjs", "vite", "fastapi", "streamlit"])
 def test_all_stacks_render_dockerfile(stack):
     """Single-app stacks render a top-level Dockerfile.
 
@@ -150,7 +154,7 @@ def test_nextjs_fastapi_skips_top_level_dockerfile_and_fly_toml():
     assert (out / "infra" / "fly" / "deploy.sh").exists()
 
 
-@pytest.mark.parametrize("stack", ["bare", "nextjs", "static", "fastapi", "streamlit", "nextjs-fastapi"])
+@pytest.mark.parametrize("stack", ["bare", "nextjs", "vite", "fastapi", "streamlit", "nextjs-fastapi"])
 def test_cloudflare_dns_helper_and_github_workflow_render(stack):
     """Every stack ships the Cloudflare DNS helper and the GH Actions workflow."""
     out = _render(stack, internal_port=3000)
@@ -167,7 +171,7 @@ def test_cloudflare_dns_helper_and_github_workflow_render(stack):
 def test_deploy_sh_calls_cloudflare_helper():
     """deploy.sh must invoke cloudflare_dns.sh before fly certs add so DNS is in
     place when Let's Encrypt validates."""
-    out = _render("static", internal_port=80)
+    out = _render("vite", internal_port=80)
     deploy = (out / "infra" / "fly" / "deploy.sh").read_text()
     cf_idx = deploy.index("cloudflare_dns.sh")
     cert_idx = deploy.index("fly certs add")

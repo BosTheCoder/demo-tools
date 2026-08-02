@@ -14,6 +14,7 @@ from ._resources import (
     TEMPLATE_SUBDIR,
 )
 from .stacks import get_scaffolder
+from .targets import NO_DOCKERFILE_STACKS, check_target_stack, publish_mode
 
 
 def scaffold_demo(
@@ -27,10 +28,14 @@ def scaffold_demo(
 ) -> None:
     """Scaffold app + overlay infra + git init + initial commit.
 
-    ``deploy_target`` picks the default `just` dispatch target ("fly" or
-    "local"); both ``infra/`` sets are always generated so graduation is a flip.
+    ``deploy_target`` picks the default `just` dispatch target ("fly", "local"
+    or "pages"). Every ``infra/`` set the stack can actually use is generated,
+    so graduating between compatible targets is a flip; sets the stack can never
+    use are dropped (see copier.yml's _tasks) rather than shipped dead.
     ``tailscale_path`` overrides the local URL path prefix (defaults to /<name>).
     """
+    check_target_stack(deploy_target, stack)
+
     target.mkdir(parents=True, exist_ok=True)
 
     scaffolder = get_scaffolder(stack)
@@ -38,6 +43,7 @@ def scaffold_demo(
 
     ts_host = DEFAULT_TAILSCALE_HOST
     ts_path = tailscale_path or f"/{name}"
+    derived = _target_flags(stack)
 
     run_copy(
         src_path=str(TEMPLATE_DIR),
@@ -52,6 +58,7 @@ def scaffold_demo(
             "target": deploy_target,
             "tailscale_host": ts_host,
             "tailscale_path": ts_path,
+            **derived,
         },
         defaults=True,
         unsafe=True,
@@ -79,9 +86,28 @@ def scaffold_demo(
             "target": deploy_target,
             "tailscale_host": ts_host,
             "tailscale_path": ts_path,
+            **derived,
         }))
 
     _git_init_and_commit(target)
+
+
+def _target_flags(stack: str) -> dict[str, object]:
+    """Template variables derived from the stack, so copier.yml never has to
+    restate the compatibility rules that live in targets.py."""
+    return {
+        "dockerised": stack not in NO_DOCKERFILE_STACKS,
+        "pages_ok": _pages_ok(stack),
+        "publish_mode": publish_mode(stack),
+    }
+
+
+def _pages_ok(stack: str) -> bool:
+    try:
+        check_target_stack("pages", stack)
+    except ValueError:
+        return False
+    return True
 
 
 def _git_init_and_commit(target: Path) -> None:

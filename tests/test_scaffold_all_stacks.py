@@ -1,7 +1,7 @@
 """End-to-end scaffold tests across all six stacks.
 
 Pure-Python stacks (bare, fastapi, streamlit) actually run their scaffolders.
-Node-based stacks (nextjs, static, nextjs-fastapi) intercept npx/npm calls but
+Node-based stacks (nextjs, vite, nextjs-fastapi) intercept npx/npm calls but
 pass through everything else (git, Copier's rm in _tasks) to the real
 subprocess.run. Without the passthrough, Copier's _tasks cleanup for
 nextjs-fastapi (rm -f Dockerfile fly.toml compose.yml) wouldn't run.
@@ -35,7 +35,7 @@ def test_scaffold_pure_python_stacks(stack, tmp_path):
     assert (target / ".git").is_dir()
 
 
-@pytest.mark.parametrize("stack", ["nextjs", "static"])
+@pytest.mark.parametrize("stack", ["nextjs", "vite"])
 def test_scaffold_node_stacks_mocks_npm(stack, tmp_path):
     target = tmp_path / "tmp-demo"
 

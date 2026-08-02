@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import typer
 
-VALID_STACKS = ("nextjs", "nextjs-fastapi", "fastapi", "streamlit", "static", "bare")
+VALID_STACKS = ("nextjs", "nextjs-fastapi", "fastapi", "streamlit", "vite", "html", "bare")
 
 
 def _run_scaffold(
@@ -14,8 +14,23 @@ def _run_scaffold(
 ) -> None:
     from pathlib import Path
     from .scaffold import scaffold_demo
-    if target == "local" and profile != "demo":
-        typer.echo("Note: --profile only affects Fly; ignored for --target local.")
+    from .targets import check_target_stack
+
+    if stack not in VALID_STACKS:
+        typer.echo(
+            f"Error: unknown stack '{stack}'. Valid: {', '.join(VALID_STACKS)}", err=True
+        )
+        raise typer.Exit(1)
+
+    # Checked before anything is written, so a bad pairing costs no files.
+    try:
+        check_target_stack(target, stack)
+    except ValueError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(1) from exc
+
+    if target != "fly" and profile != "demo":
+        typer.echo(f"Note: --profile only affects Fly; ignored for --target {target}.")
     dest = Path.cwd() / name
     if dest.exists():
         typer.echo(f"Error: {dest} already exists.", err=True)
@@ -32,7 +47,8 @@ _ADOPT_DEFAULTS = {
     # stack -> (stateful, internal_port)
     "bare": (False, 3000),
     "nextjs": (False, 3000),
-    "static": (False, 80),
+    "vite": (False, 80),
+    "html": (False, 8000),
     "fastapi": (True, 8000),
     "streamlit": (True, 8501),
     "nextjs-fastapi": (True, 3000),
@@ -48,12 +64,17 @@ def _run_adopt(
 ) -> None:
     from pathlib import Path
     from .adopt import detect_stack, overlay_infra
+    from .targets import check_target_stack
 
-    if target == "local" and profile != "demo":
-        typer.echo("Note: --profile only affects Fly; ignored for --target local.")
+    if target != "fly" and profile != "demo":
+        typer.echo(f"Note: --profile only affects Fly; ignored for --target {target}.")
 
     repo = Path.cwd()
-    if not (repo / "Dockerfile").exists():
+    if target == "pages":
+        # adopt requires a Dockerfile because fly/local build an image; pages
+        # does not, so the check below would reject valid static repos.
+        pass
+    elif not (repo / "Dockerfile").exists():
         typer.echo("Error: no Dockerfile in current directory.", err=True)
         typer.echo("`demo-init adopt` is for existing dockerized repos.", err=True)
         typer.echo("To scaffold a new demo: demo-init <stack> <name>", err=True)
@@ -81,6 +102,12 @@ def _run_adopt(
         )
         raise typer.Exit(1)
 
+    try:
+        check_target_stack(target, stack)
+    except ValueError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(1) from exc
+
     name = repo.name
     stateful, port = _ADOPT_DEFAULTS[stack]
     overlay_infra(repo, name=name, stack=stack, stateful=stateful,
@@ -105,12 +132,20 @@ Stacks (used with the scaffold command: demo-init scaffold <stack> <name>):
   nextjs-fastapi  Next.js web + FastAPI api, dual Fly app (api on .internal)
   fastapi         FastAPI starter, SQLite + Fly volume
   streamlit       Streamlit starter, SQLite + Fly volume
-  static          Vite + nginx static site
+  vite            Vite SPA + nginx (bundled; JSX/TS/npm)
+  html            Plain HTML/JS/CSS, no build step (GitHub Pages only)
   bare            Empty app/, bring your own Dockerfile
+
+Targets (--target):
+
+  fly             Fly.io machine, auto-stop billing        (default)
+  local           Always-on container exposed via Tailscale
+  pages           GitHub Pages — static files, no server   (html, vite, bare)
 
 Examples:
 
-  demo-init scaffold static my-site
+  demo-init scaffold html link-tool --target pages
+  demo-init scaffold vite my-site
   demo-init scaffold nextjs my-app
   demo-init adopt
 """
@@ -136,7 +171,10 @@ def _target_option() -> typer.Option:
     return typer.Option(
         "fly",
         "--target",
-        help="fly (cloud) | local (always-on container exposed via Tailscale)",
+        help=(
+            "fly (cloud) | local (always-on container exposed via Tailscale) | "
+            "pages (GitHub Pages, static only)"
+        ),
     )
 
 

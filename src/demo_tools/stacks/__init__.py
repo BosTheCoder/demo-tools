@@ -12,7 +12,8 @@ class StackScaffolder(Protocol):
 _MODULE_NAMES = {
     "bare": "bare",
     "nextjs": "nextjs",
-    "static": "static",
+    "vite": "vite",
+    "html": "html",
     "fastapi": "fastapi",
     "streamlit": "streamlit",
     "nextjs-fastapi": "nextjs_fastapi",

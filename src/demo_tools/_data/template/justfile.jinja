@@ -2,7 +2,7 @@ set shell := ["bash", "-cu"]
 
 # Deploy target, baked at scaffold time. Override for one run: DEMO_TARGET=fly just deploy
 TARGET := env_var_or_default("DEMO_TARGET", "{{ target }}")
-{% raw %}
+{% if dockerised %}{% raw %}
 # Local development with hot reload
 dev:
     docker compose up
@@ -10,7 +10,16 @@ dev:
 # Build the Docker image locally to sanity-check
 build:
     docker compose build
+{% endraw %}{% else %}
+# Local development — plain static server, no container, no build step
+dev:
+    @echo "Serving . on http://localhost:{{ internal_port }}  (Ctrl-C to stop)"
+    python3 -m http.server {{ internal_port }}
 
+# Nothing to build: this stack ships the files as written
+build:
+    @echo "No build step — {{ stack }} ships source as-is. Run 'just deploy'."
+{% endif %}{% raw %}
 # Deploy to the configured target (Fly, or a local Tailscale-exposed container)
 deploy:
     bash infra/{{TARGET}}/deploy.sh
