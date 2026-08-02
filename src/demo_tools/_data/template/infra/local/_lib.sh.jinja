@@ -37,17 +37,41 @@ preflight() {
 }
 
 # Current `tailscale serve` config (empty string if unavailable).
-serve_status() { "${TS[@]}" serve status 2>/dev/null || true; }
+#
+# The WSL->Windows interop call fails intermittently on this host
+# (`UtilAcceptVsock ... accept4 failed 110`), returning 0 bytes with exit 0 —
+# observed 4 empty results in 5 consecutive calls. Retry rather than trust a
+# single read, because every predicate below is derived from this output.
+serve_status() {
+  local out i
+  for i in 1 2 3; do
+    out="$("${TS[@]}" serve status 2>/dev/null || true)"
+    [[ -n "$out" ]] && { printf '%s' "$out"; return 0; }
+    sleep 1
+  done
+  printf ''
+}
+
+# The predicates below take the status as an ARGUMENT. They used to each call
+# serve_status themselves, so one conflict check ran the flaky command twice: if
+# the first read succeeded and the second came back empty, serve_path_registered
+# said "no" and the caller wrongly concluded a different backend owned the path,
+# aborting the deploy with:
+#   ERROR: /foo is already served by a different backend.
+# Read once, decide from that one snapshot.
 
 # True when TS_PATH is already served AND points at our container's port.
 # Re-deploys of a registered app hit this and skip the (admin-gated) serve write.
 serve_path_registered() {
-  serve_status | grep -qE "(^|[[:space:]])${TS_PATH}[[:space:]]+proxy[[:space:]]+https?://127\.0\.0\.1:${INTERNAL_PORT}(\b|/|$)"
+  printf '%s' "$1" | grep -qE "(^|[[:space:]])${TS_PATH}[[:space:]]+proxy[[:space:]]+https?://127\.0\.0\.1:${INTERNAL_PORT}(\b|/|$)"
 }
 
 # True when TS_PATH is served by a DIFFERENT backend (a real conflict, e.g. /calibre).
+# Empty status means "couldn't read it", NOT "someone else owns the path" — never
+# fail a deploy on a failed read.
 serve_path_conflict() {
-  serve_status | grep -qE "(^|[[:space:]])${TS_PATH}[[:space:]]" && ! serve_path_registered
+  [[ -n "$1" ]] || return 1
+  printf '%s' "$1" | grep -qE "(^|[[:space:]])${TS_PATH}[[:space:]]" && ! serve_path_registered "$1"
 }
 
 # Writing `tailscale serve` config requires Windows local admin (verified on

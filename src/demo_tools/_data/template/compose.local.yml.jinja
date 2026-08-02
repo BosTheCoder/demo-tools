@@ -5,14 +5,23 @@
 # Adds a restart policy, the base-path env var (ROOT_PATH), a gitignored .env,
 # and a host bind-mount for SQLite. `just dev` uses compose.yml alone, so none
 # of this affects foreground dev.
+#
+# stop_grace_period: Docker's default is 10s. An app with background work (a
+# thread pool draining in-flight HTTP calls, a queue flushing) can take longer,
+# and when it does Docker SIGKILLs it (exit 137) while compose is recreating —
+# the remove then races a still-running container and the deploy dies with
+# "cannot remove container ...: container is running". Give shutdown room; a
+# fast-exiting app never uses it, so the only cost is patience on a slow one.
 {%- if stack == "nextjs-fastapi" %}
 services:
   web:
     restart: unless-stopped
+    stop_grace_period: 45s
     environment:
       ROOT_PATH: "{{ tailscale_path }}"   # base path the web app is served under on local
   api:
     restart: unless-stopped
+    stop_grace_period: 45s
     env_file:
       - path: .env
         required: false
@@ -22,6 +31,7 @@ services:
 services:
   app:
     restart: unless-stopped
+    stop_grace_period: 45s
     environment:
       ROOT_PATH: "{{ tailscale_path }}"   # e.g. /job-tracker — the app's base path on local
     env_file:

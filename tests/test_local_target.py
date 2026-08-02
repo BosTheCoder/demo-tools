@@ -108,7 +108,95 @@ def test_local_scripts_have_no_fly_isms():
             assert ism not in text, f"{script.name} leaks fly-ism {ism!r}"
 
 
+# --- serve-status robustness (regression) ------------------------------------
+#
+# `tailscale.exe serve status` is reached through WSL->Windows interop, which
+# fails intermittently on Bos-Desktop (`UtilAcceptVsock ... accept4 failed 110`)
+# and returns 0 bytes with exit 0 — 4 empties in 5 calls, observed. The predicates
+# used to each re-run it, so ONE conflict check invoked it twice; when the second
+# read came back empty, deploy aborted with "already served by a different
+# backend" against a path it owned. Read once, and never infer from an empty read.
+
+SERVE_OK = """https://bos-desktop.fish-grouper.ts.net (tailnet only)
+|-- /            path  C:\\Users\\Bosire\\srv\\home
+|-- /tmp-demo    proxy http://127.0.0.1:8000
+|-- /calibre     proxy http://127.0.0.1:8080
+"""
+SERVE_OTHER = SERVE_OK.replace("/tmp-demo    proxy http://127.0.0.1:8000",
+                               "/tmp-demo    proxy http://127.0.0.1:9999")
+
+
+def _run_lib(lib: Path, snippet: str, env: dict | None = None):
+    """Source the rendered _lib.sh and run a bash snippet against it."""
+    import subprocess
+    return subprocess.run(
+        ["bash", "-c", f'source "{lib}"\n{snippet}'],
+        capture_output=True, text=True, env={**os.environ, **(env or {})},
+    )
+
+
+def test_serve_path_conflict_ignores_an_empty_status_read():
+    """An unreadable status must never be reported as someone else's backend."""
+    lib = _render() / "infra" / "local" / "_lib.sh"
+    r = _run_lib(lib, 'if serve_path_conflict ""; then echo CONFLICT; else echo CLEAR; fi')
+    assert r.stdout.strip() == "CLEAR", r.stderr
+
+
+def test_serve_path_conflict_true_only_for_a_different_backend():
+    lib = _render() / "infra" / "local" / "_lib.sh"
+    ours = _run_lib(lib, f'if serve_path_conflict "{SERVE_OK}"; then echo CONFLICT; else echo CLEAR; fi')
+    assert ours.stdout.strip() == "CLEAR", ours.stderr
+    # A real conflict (our path pointing at another port) must still be caught.
+    other = _run_lib(lib, f'if serve_path_conflict "{SERVE_OTHER}"; then echo CONFLICT; else echo CLEAR; fi')
+    assert other.stdout.strip() == "CONFLICT", other.stderr
+
+
+def test_serve_path_registered_reads_the_snapshot_it_is_given():
+    lib = _render() / "infra" / "local" / "_lib.sh"
+    r = _run_lib(lib, f'if serve_path_registered "{SERVE_OK}"; then echo YES; else echo NO; fi')
+    assert r.stdout.strip() == "YES", r.stderr
+    r2 = _run_lib(lib, 'if serve_path_registered ""; then echo YES; else echo NO; fi')
+    assert r2.stdout.strip() == "NO", r2.stderr
+
+
+def test_serve_status_retries_a_flaky_interop_call(tmp_path):
+    """Two empty reads then a good one must still yield the real status."""
+    lib = _render() / "infra" / "local" / "_lib.sh"
+    counter = tmp_path / "n"
+    counter.write_text("0")
+    fake = tmp_path / "tailscale"
+    fake.write_text(
+        "#!/usr/bin/env bash\n"
+        f'n=$(cat "{counter}"); echo $((n+1)) > "{counter}"\n'
+        f'[ "$n" -ge 2 ] && cat <<\'EOF\'\n{SERVE_OK}EOF\n'
+        "exit 0\n"
+    )
+    fake.chmod(0o755)
+    r = _run_lib(lib, f'TS=("{fake}"); out="$(serve_status)"; printf "%s" "$out" | grep -c "tmp-demo"')
+    assert r.stdout.strip() == "1", f"stdout={r.stdout!r} stderr={r.stderr!r}"
+    assert counter.read_text().strip() == "3"  # retried twice, succeeded on the third
+
+
+def test_deploy_reads_serve_status_once_and_passes_the_snapshot():
+    """The TOCTOU guard: one read up front, then predicates take it as an arg."""
+    deploy = (_render() / "infra" / "local" / "deploy.sh").read_text()
+    assert 'TS_STATUS="$(serve_status)"' in deploy
+    assert 'serve_path_conflict "$TS_STATUS"' in deploy
+    assert 'serve_path_registered "$TS_STATUS"' in deploy
+    # Bare, argument-less predicate calls are what caused the double read.
+    assert "if serve_path_conflict;" not in deploy
+    assert "if serve_path_registered;" not in deploy
+
+
 # --- compose.local.yml overlay ----------------------------------------------
+
+def test_local_compose_overlay_gives_shutdown_room():
+    """Docker's 10s default SIGKILLed slow-draining apps (exit 137) mid-recreate,
+    which made compose's remove race a still-running container."""
+    for stack, port, stateful in (("fastapi", 8000, True), ("nextjs", 3000, False)):
+        c = (_render(stack, internal_port=port, stateful=stateful) / "compose.local.yml").read_text()
+        assert "stop_grace_period: 45s" in c, stack
+
 
 def test_local_compose_overlay_stateful_has_bind_mount():
     c = (_render("fastapi", internal_port=8000) / "compose.local.yml").read_text()
