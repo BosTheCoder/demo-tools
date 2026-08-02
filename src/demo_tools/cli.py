@@ -242,29 +242,41 @@ def prune(
 ) -> None:
     """Interactively destroy demos older than the given age."""
     import datetime as dt
-    import json
     import subprocess as sp
 
-    from .fleet import list_apps, list_demos_only, parse_duration
+    from .fleet import (
+        fetch_app_config,
+        fly_app_name,
+        is_always_on,
+        list_apps,
+        list_demos_only,
+        parse_duration,
+    )
 
     cutoff = dt.datetime.now(dt.timezone.utc) - parse_duration(older_than)
 
     candidates = []
+    protected = []
     for app in list_demos_only(list_apps()):
-        try:
-            r = sp.run(
-                ["fly", "status", "--app", app["name"], "--json"],
-                capture_output=True, text=True, check=True,
-            )
-            status = json.loads(r.stdout)
-            created = status.get("App", {}).get("CreatedAt")
-            if not created:
-                continue
-            created_dt = dt.datetime.fromisoformat(created.replace("Z", "+00:00"))
-            if created_dt < cutoff:
-                candidates.append((app["name"], created_dt, app.get("kind")))
-        except sp.CalledProcessError:
+        created = app.get("last_deployed")
+        if not created:
+            # Loud, not silent — a skipped app used to look like a clean fleet.
+            typer.echo(f"  ! {app['name']}: no release date; skipped")
             continue
+        created_dt = dt.datetime.fromisoformat(created.replace("Z", "+00:00"))
+        if created_dt >= cutoff:
+            continue
+        # Not app["name"]: a nextjs-fastapi entry is a synthetic base name that
+        # does not exist on Fly, so looking it up directly always fails.
+        if is_always_on(fetch_app_config(fly_app_name(app))):
+            protected.append(app["name"])
+            continue
+        candidates.append((app["name"], created_dt, app.get("kind")))
+
+    if protected:
+        typer.echo("Protected (always-on, treated as a service — never pruned):")
+        for name in protected:
+            typer.echo(f"  {name}")
 
     if not candidates:
         typer.echo(f"No demos older than {older_than}.")

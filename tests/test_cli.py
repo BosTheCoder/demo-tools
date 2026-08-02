@@ -1,8 +1,18 @@
+import subprocess as sp
+
 from typer.testing import CliRunner
 
 from demo_tools.cli import init_app, demo_app
 
 runner = CliRunner()
+
+# Deployed fly.toml shapes, as `fly config show` returns them.
+_DEMO_CONFIG = (
+    '{"http_service":{"auto_stop_machines":"stop","min_machines_running":0}}'
+)
+_SERVICE_CONFIG = (
+    '{"http_service":{"auto_stop_machines":false,"min_machines_running":1}}'
+)
 
 
 def test_init_app_help_lists_subcommands():
@@ -121,15 +131,13 @@ def test_prune_dry_run_lists_without_destroying(mocker):
     mocker.patch("demo_tools.fleet.list_apps", return_value=[{"name": "old"}])
     mocker.patch(
         "demo_tools.fleet.list_demos_only",
-        return_value=[{"name": "old", "status": "stopped", "kind": "nextjs"}],
+        return_value=[{"name": "old", "status": "stopped", "kind": "nextjs",
+                       "last_deployed": "2020-01-01T00:00:00Z"}],
     )
 
     def fake_run(argv, *a, **k):
-        if argv[:2] == ["fly", "status"]:
-            return mocker.Mock(
-                returncode=0,
-                stdout='{"App":{"CreatedAt":"2020-01-01T00:00:00Z"}}',
-            )
+        if argv[:3] == ["fly", "config", "show"]:
+            return mocker.Mock(returncode=0, stdout=_DEMO_CONFIG)
         return mocker.Mock(returncode=0, stdout="", stderr="")
 
     run = mocker.patch("subprocess.run", side_effect=fake_run)
@@ -143,3 +151,89 @@ def test_prune_dry_run_lists_without_destroying(mocker):
         if c.args and c.args[0][:3] == ["fly", "apps", "destroy"]
     ]
     assert destroy == []
+
+
+def test_prune_skips_app_with_no_release_date_loudly(mocker):
+    mocker.patch("demo_tools.fleet.list_apps", return_value=[{"name": "never"}])
+    mocker.patch(
+        "demo_tools.fleet.list_demos_only",
+        return_value=[{"name": "never", "status": "pending", "last_deployed": None}],
+    )
+    run = mocker.patch("subprocess.run",
+                       return_value=mocker.Mock(returncode=0, stdout="", stderr=""))
+
+    result = runner.invoke(demo_app, ["prune", "--older-than", "1d", "--yes"])
+
+    assert result.exit_code == 0, result.stdout
+    assert "never" in result.stdout
+    assert "skipped" in result.stdout
+    destroy = [
+        c for c in run.call_args_list
+        if c.args and c.args[0][:3] == ["fly", "apps", "destroy"]
+    ]
+    assert destroy == []
+
+
+def test_prune_never_destroys_an_always_on_service(mocker):
+    """The buildwithbos case: a production app must survive `prune --yes`.
+
+    The service/demo profile is not recorded on Fly, so prune infers it from the
+    deployed autostop config. Without this guard, `--yes` skips the per-app
+    prompt and takes the live site with it.
+    """
+    mocker.patch("demo_tools.fleet.list_apps", return_value=[{"name": "buildwithbos"}])
+    mocker.patch(
+        "demo_tools.fleet.list_demos_only",
+        return_value=[{"name": "buildwithbos", "status": "deployed", "kind": "nextjs",
+                       "last_deployed": "2020-01-01T00:00:00Z"}],
+    )
+
+    def fake_run(argv, *a, **k):
+        if argv[:3] == ["fly", "config", "show"]:
+            return mocker.Mock(returncode=0, stdout=_SERVICE_CONFIG)
+        return mocker.Mock(returncode=0, stdout="", stderr="")
+
+    run = mocker.patch("subprocess.run", side_effect=fake_run)
+
+    result = runner.invoke(demo_app, ["prune", "--older-than", "1d", "--yes"])
+
+    assert result.exit_code == 0, result.stdout
+    assert "Protected" in result.stdout
+    assert "buildwithbos" in result.stdout
+    destroy = [
+        c for c in run.call_args_list
+        if c.args and c.args[0][:3] == ["fly", "apps", "destroy"]
+    ]
+    assert destroy == []
+
+
+def test_prune_finds_nextjs_fastapi_pair_via_the_web_app(mocker):
+    """<base> is synthetic. The config lookup behind the guard must target
+    <base>-web, or it 404s, the app reads as unclassifiable, and the pair is
+    protected forever and can never be pruned."""
+    mocker.patch("demo_tools.fleet.list_apps", return_value=[{"name": "chord-web"}])
+    mocker.patch(
+        "demo_tools.fleet.list_demos_only",
+        return_value=[{"name": "chord", "status": "deployed", "kind": "nextjs-fastapi",
+                       "last_deployed": "2020-01-01T00:00:00Z"}],
+    )
+
+    def fake_run(argv, *a, **k):
+        if argv[:3] == ["fly", "config", "show"]:
+            # Only the real -web app resolves; the synthetic base 404s.
+            if argv[-1] != "chord-web":
+                raise sp.CalledProcessError(1, argv)
+            return mocker.Mock(returncode=0, stdout=_DEMO_CONFIG)
+        return mocker.Mock(returncode=0, stdout="", stderr="")
+
+    run = mocker.patch("subprocess.run", side_effect=fake_run)
+
+    result = runner.invoke(demo_app, ["prune", "--older-than", "1d", "--yes"])
+
+    assert result.exit_code == 0, result.stdout
+    assert "Protected" not in result.stdout
+    destroyed = [
+        c.args[0][-1] for c in run.call_args_list
+        if c.args and c.args[0][:3] == ["fly", "apps", "destroy"]
+    ]
+    assert destroyed == ["chord-web", "chord-api"]
