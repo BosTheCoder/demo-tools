@@ -169,13 +169,52 @@ def test_cloudflare_dns_helper_and_github_workflow_render(stack):
 
 
 def test_deploy_sh_calls_cloudflare_helper():
-    """deploy.sh must invoke cloudflare_dns.sh before fly certs add so DNS is in
-    place when Let's Encrypt validates."""
+    """DNS must be updated before certs are requested, so the records are in
+    place when Let's Encrypt validates. Both now run inside publish_hostnames,
+    so the order that matters is the order of the calls in that function."""
     out = _render("vite", internal_port=80)
     deploy = (out / "infra" / "fly" / "deploy.sh").read_text()
-    cf_idx = deploy.index("cloudflare_dns.sh")
-    cert_idx = deploy.index("fly certs add")
-    assert cf_idx < cert_idx, "Cloudflare DNS update must run before cert add"
+    body = deploy.split("publish_hostnames() {", 1)[1].split("\n}", 1)[0]
+    assert body.index("cloudflare_dns.sh") < body.index("ensure_certs"), (
+        "Cloudflare DNS update must run before cert provisioning"
+    )
+
+
+def test_hostnames_default_to_the_demo_subdomain():
+    """An app that answers no hostname question still gets its demo subdomain,
+    so every demo scaffolded before `hostnames` existed keeps working."""
+    out = _render("vite", internal_port=80)
+    deploy = (out / "infra" / "fly" / "deploy.sh").read_text()
+    assert 'HOSTNAMES=("tmp-demo.demos.buildwithbos.com")' in deploy
+    assert "tmp-demo.demos.buildwithbos.com" in (out / "infra" / "fly" / "open.sh").read_text()
+
+
+def test_explicit_hostnames_replace_the_demo_subdomain():
+    """An app that owns real domains lists them, and the demo subdomain it never
+    asked for is not invented for it."""
+    out = _render("vite", internal_port=80,
+                  hostnames=["example.com", "www.example.com"])
+    deploy = (out / "infra" / "fly" / "deploy.sh").read_text()
+    assert 'HOSTNAMES=("example.com" "www.example.com")' in deploy
+    assert "tmp-demo.demos.buildwithbos.com" not in deploy
+    assert 'URL="https://example.com"' in (out / "infra" / "fly" / "open.sh").read_text()
+
+
+def test_empty_hostnames_skips_dns_and_certs():
+    """`hostnames: []` means deploy only — nothing touches DNS or certs."""
+    out = _render("vite", internal_port=80, hostnames=[])
+    deploy = (out / "infra" / "fly" / "deploy.sh").read_text()
+    assert "HOSTNAMES=()" in deploy
+    assert "skipping DNS and certs" in deploy
+    assert "tmp-demo.demos.buildwithbos.com" not in deploy
+
+
+def test_cloudflare_helper_leaves_hand_made_dns_alone():
+    """A hostname already served by a CNAME, or a record someone proxied, must
+    survive a deploy untouched."""
+    cf = (_render("vite", internal_port=80) / "infra" / "fly" / "cloudflare_dns.sh").read_text()
+    assert "a CNAME already points it somewhere" in cf
+    assert "REC_PROXIED" in cf, "existing records must keep their proxy setting"
 
 
 def test_demo_profile_default_emits_autostop():

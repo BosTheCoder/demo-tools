@@ -39,6 +39,15 @@ domain_base:
   help: "Subdomain base (results in <name>.<domain_base>)"
   default: "demos.buildwithbos.com"
 
+hostnames:
+  type: yaml
+  help: >-
+    Public hostnames this app answers on. Defaults to the one demo subdomain.
+    An app that owns real domains lists them instead (e.g.
+    ['example.com', 'www.example.com']) so a deploy stops inventing a demo
+    hostname for it. An empty list means deploy only: no DNS, no certs.
+  default: "['{{ name }}.{{ domain_base }}']"
+
 profile:
   type: str
   help: "demo (auto-stop, 0 min machines) | service (always-on, ≥1 machine)"

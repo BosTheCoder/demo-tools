@@ -2,7 +2,7 @@
 # MANAGED BY demo-tools — DO NOT EDIT. Run `just sync` to update.
 set -euo pipefail
 APP="{{ name }}"
-HOST="{{ name }}.{{ domain_base }}"
+HOSTNAMES=({% for h in hostnames %}"{{ h }}"{{ " " if not loop.last }}{% endfor %})
 {% if stack == "nextjs-fastapi" -%}
 echo "== ${APP}-web =="
 fly status --app "${APP}-web"
@@ -12,11 +12,12 @@ fly status --app "${APP}-api"
 echo
 echo "URLs:"
 echo "  https://${APP}-web.fly.dev"
-echo "  https://${HOST}"
 {%- else -%}
 fly status --app "$APP"
 echo
 echo "URLs:"
 echo "  https://${APP}.fly.dev"
-echo "  https://${HOST}"
 {%- endif %}
+for host in ${HOSTNAMES[@]+"${HOSTNAMES[@]}"}; do
+    echo "  https://${host}"
+done

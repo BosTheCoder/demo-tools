@@ -1,8 +1,12 @@
 #!/usr/bin/env bash
 # MANAGED BY demo-tools — DO NOT EDIT. Run `just sync` to update.
 set -euo pipefail
-HOST="{{ name }}.{{ domain_base }}"
-URL="https://${HOST}"
+# First configured hostname, or the fly.dev name when the app has none.
+{% if stack == "nextjs-fastapi" -%}
+URL="https://{{ hostnames[0] if hostnames else name ~ '-web.fly.dev' }}"
+{%- else -%}
+URL="https://{{ hostnames[0] if hostnames else name ~ '.fly.dev' }}"
+{%- endif %}
 if command -v xdg-open >/dev/null 2>&1; then
     xdg-open "$URL"
 elif command -v open >/dev/null 2>&1; then

@@ -18,7 +18,12 @@ Demo deployed via [demo-tools](https://github.com/BosTheCoder/demo-tools).
 {% else -%}
 - **Live URLs:**
   - https://{{ name }}.fly.dev (always works)
-  - https://{{ name }}.{{ domain_base }} (requires `*.{{ domain_base }}` wildcard DNS pointing at Fly)
+{% for h in hostnames -%}
+  - https://{{ h }}
+{% endfor -%}
+  Hostnames come from the `hostnames` list in `.demo-template-version`; `just deploy`
+  points each one at this app's IPs and provisions a cert. Set it to the real
+  domains for an app that owns them, or `[]` to deploy without touching DNS.
 {% endif -%}
 - **Stop / start / destroy:** `just stop` / `just start` / `just destroy`
 - **Update infra files:** `just sync`
