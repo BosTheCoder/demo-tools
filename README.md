@@ -227,7 +227,7 @@ Each scaffolded demo ships with a `justfile` that wraps the platform calls. From
 
 | `just <verb>`           | What it does                                                            |
 | ----------------------- | ----------------------------------------------------------------------- |
-| `just dev`              | `docker compose up` for local development                               |
+| `just dev`              | Run locally. Layers `compose.dev.yml` (bind-mounted source + a reloading server) over `compose.yml` when the repo has one; otherwise runs the production image and says so. |
 | `just build`            | Sanity-check the Docker image locally                                   |
 | `just deploy`           | Create the Fly app if needed, deploy, ensure TLS cert                   |
 | `just stop`             | Stop all machines (billing → ~$0)                                       |

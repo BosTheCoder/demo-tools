@@ -1,0 +1,31 @@
+# MANAGED BY demo-tools — DO NOT EDIT. Run `just sync` to update.
+#
+# Dev overlay for `just dev`, applied on top of compose.yml:
+#   docker compose -f compose.yml -f compose.dev.yml up
+# Nothing else reads it — `just build` and `just deploy` see compose.yml (plus
+# compose.local.yml on the local target) alone, so production is untouched.
+#
+# What it buys: the base compose.yml runs the PRODUCTION image, so every source
+# change needed a rebuild before the app picked it up. This bind-mounts ./app
+# over the image's copy and swaps the CMD for a reloading one, so edits apply
+# in place. Dependencies still come from the image — change requirements.txt
+# and you still need `just build`.
+#
+# Polling watchers: the source usually lives on a WSL/ext4 filesystem that the
+# Docker VM sees through a 9p/virtiofs share, and inotify events do not cross
+# it reliably. Polling is a little more CPU for a watcher that actually fires.
+{%- if stack == "fastapi" %}
+services:
+  app:
+    volumes:
+      - ./app:/app
+    environment:
+      WATCHFILES_FORCE_POLLING: "true"
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "{{ internal_port }}", "--reload", "--reload-dir", "/app"]
+{%- elif stack == "streamlit" %}
+services:
+  app:
+    volumes:
+      - ./app:/app
+    command: ["streamlit", "run", "streamlit_app.py", "--server.port={{ internal_port }}", "--server.address=0.0.0.0", "--server.headless=true", "--server.runOnSave=true", "--server.fileWatcherType=poll"]
+{%- endif %}

@@ -237,3 +237,39 @@ def test_scaffold_demo_default_profile_is_demo(tmp_path):
     assert "min_machines_running = 0" in fly_toml
     answers = (target / ".demo-template-version").read_text()
     assert "profile: demo" in answers
+
+
+# --- dev overlay (`just dev` hot reload) --------------------------------------
+#
+# Regression: `dev` used to be a bare `docker compose up` under a comment that
+# promised hot reload. It ran the PRODUCTION image, so nothing reloaded and
+# every change needed a rebuild.
+
+@pytest.mark.parametrize("stack,port", [("fastapi", 8000), ("streamlit", 8501)])
+def test_stacks_we_own_get_a_working_dev_overlay(stack, port):
+    out = _render(stack, internal_port=port)
+    overlay = out / "compose.dev.yml"
+    assert overlay.exists()
+    content = overlay.read_text()
+    assert "./app:/app" in content          # source is bind-mounted, not baked
+    assert str(port) in content
+    # A reloading command, not the image's production CMD.
+    assert "--reload" in content or "runOnSave" in content
+
+
+@pytest.mark.parametrize("stack,port", [("bare", 3000), ("nextjs", 3000),
+                                        ("vite", 80), ("nextjs-fastapi", 3000)])
+def test_stacks_without_a_usable_dev_overlay_ship_none(stack, port):
+    """Better an honest fallback than an overlay that fails on first use."""
+    out = _render(stack, internal_port=port)
+    assert not (out / "compose.dev.yml").exists()
+
+
+@pytest.mark.parametrize("stack,port", [("bare", 3000), ("fastapi", 8000)])
+def test_dev_recipe_layers_the_overlay_when_present(stack, port):
+    just = (_render(stack, internal_port=port) / "justfile").read_text()
+    assert "docker compose -f compose.yml -f compose.dev.yml up" in just
+    # Falls back to the production image, and says so, when there is no overlay.
+    assert "no hot reload" in just
+    # The comment must not promise reload unconditionally.
+    assert "# Local development with hot reload" not in just

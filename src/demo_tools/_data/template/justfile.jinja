@@ -3,9 +3,17 @@ set shell := ["bash", "-cu"]
 # Deploy target, baked at scaffold time. Override for one run: DEMO_TARGET=fly just deploy
 TARGET := env_var_or_default("DEMO_TARGET", "{{ target }}")
 {% if dockerised %}{% raw %}
-# Local development with hot reload
+# Local development. compose.dev.yml (when the stack ships one) bind-mounts the
+# source over the image and runs a reloading server, so edits apply without a
+# rebuild. Without it this is the production image — correct, but a rebuild per
+# change. Add a compose.dev.yml to your repo and this recipe picks it up.
 dev:
-    docker compose up
+    if [ -f compose.dev.yml ]; then \
+        docker compose -f compose.yml -f compose.dev.yml up; \
+    else \
+        echo "No compose.dev.yml — running the production image (no hot reload)."; \
+        docker compose up; \
+    fi
 
 # Build the Docker image locally to sanity-check
 build:

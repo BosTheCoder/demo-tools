@@ -4,7 +4,11 @@ Demo deployed via [demo-tools](https://github.com/BosTheCoder/demo-tools).
 
 - **Stack:** {{ stack }}
 - **Deploy target:** {{ target }}
-- **Local dev:** `just dev`
+{% if stack in ["fastapi", "streamlit"] -%}
+- **Local dev:** `just dev` — hot reload via `compose.dev.yml` (your `app/` is bind-mounted, so edits apply without a rebuild; changing `requirements.txt` still needs `just build`).
+{% else -%}
+- **Local dev:** `just dev` — runs the production image, so a source change needs a rebuild. For hot reload, add a `compose.dev.yml` that bind-mounts your source and runs your dev server; `just dev` layers it automatically.
+{% endif -%}
 - **Deploy:** `just deploy`
 {% if target == "local" -%}
 - **Live URL** (Tailscale, tailnet-only):

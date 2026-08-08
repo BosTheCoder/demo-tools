@@ -107,4 +107,10 @@ _tasks:
   # Only ship infra a stack can actually use. A directory of scripts that can
   # never run is worse than no directory: it reads as a supported path.
   - "{% if not pages_ok %}rm -rf infra/pages{% endif %}"
+  # Only the stacks whose Dockerfile this template owns can get a dev overlay
+  # that actually runs (nextjs ships a standalone runner, vite ships nginx —
+  # neither production image can host a dev server, and `bare` has no Dockerfile
+  # at all). The others fall back to the production image and say so, which
+  # beats shipping an overlay that fails on first use.
+  - "{% if stack not in ['fastapi', 'streamlit'] %}rm -f compose.dev.yml{% endif %}"
   - "{% if not dockerised %}rm -rf infra/fly infra/local fly.toml Dockerfile .dockerignore compose.yml compose.local.yml .github{% endif %}"
