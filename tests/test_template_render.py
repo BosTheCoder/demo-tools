@@ -209,6 +209,23 @@ def test_empty_hostnames_skips_dns_and_certs():
     assert "tmp-demo.demos.buildwithbos.com" not in deploy
 
 
+@pytest.mark.parametrize("stack", ["bare", "nextjs", "vite", "fastapi", "streamlit"])
+def test_app_owned_files_never_claim_to_be_managed(stack):
+    """`demo sync` decides what to overwrite by looking for the marker, so a
+    file the app is meant to edit must not contain that string anywhere — not
+    even inside a comment explaining what the marker means. A justfile comment
+    saying "rewrites files stamped MANAGED BY demo-tools" put the justfile on
+    sync's overwrite list and clobbered hand-edited recipes."""
+    out = _render(stack, internal_port=3000)
+    for name in ["justfile", "README.md", "Dockerfile", "fly.toml", "compose.yml"]:
+        path = out / name
+        if not path.exists():
+            continue
+        assert "MANAGED BY demo-tools" not in path.read_text(), (
+            f"{name} claims to be template-managed; sync would overwrite it"
+        )
+
+
 def test_cloudflare_helper_leaves_hand_made_dns_alone():
     """A hostname already served by a CNAME, or a record someone proxied, must
     survive a deploy untouched."""

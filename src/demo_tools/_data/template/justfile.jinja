@@ -69,6 +69,8 @@ db-create:
     bash infra/{{TARGET}}/db-create.sh
 {% endraw %}
 # Pull latest infra improvements from the demo-tools template. Rewrites only
-# the files stamped `MANAGED BY demo-tools`; app files are left alone.
+# the generated infra scripts, which say so in their own first line; the files
+# this repo owns (Dockerfile, fly.toml, compose.yml, this justfile, README) are
+# left alone.
 sync:
     uvx --from git+https://github.com/BosTheCoder/demo-tools demo sync
