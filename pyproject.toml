@@ -34,11 +34,12 @@ include = [
     "src/demo_tools/**",
 ]
 
-# Bundle the Copier template and shipped starters as package data so the
-# installed wheel contains them at runtime (resolved via _resources.py).
-[tool.hatch.build.targets.wheel.force-include]
-"src/demo_tools/_data/template" = "demo_tools/_data/template"
-"src/demo_tools/_data/starters" = "demo_tools/_data/starters"
+# The Copier template and shipped starters live under src/demo_tools/_data and
+# are picked up by the `include` above, which maps through `packages`. They used
+# to ALSO be force-included, which made `uv tool install`/`uvx` from a git URL
+# fail outright: "A second file is being added to the wheel archive at the same
+# path: demo_tools/_data/starters/fastapi/main.py". Nothing installed from git
+# until this came out.
 
 [dependency-groups]
 dev = [
