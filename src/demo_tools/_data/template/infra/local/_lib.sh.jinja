@@ -6,7 +6,11 @@
 set -euo pipefail
 
 APP="{{ name }}"
-INTERNAL_PORT="{{ internal_port }}"
+# The HOST-published port (compose maps host:container), which is what Tailscale
+# serve proxies to — NOT the port inside the container. It was previously named
+# after the container port, which invited hand-edits here that the next sync
+# silently reverted. Set the `host_port` answer instead of editing this line.
+HOST_PORT="{{ host_port }}"
 TS_HOST="{{ tailscale_host }}"
 TS_PATH="{{ tailscale_path }}"
 URL="https://${TS_HOST}${TS_PATH}"
@@ -63,7 +67,7 @@ serve_status() {
 # True when TS_PATH is already served AND points at our container's port.
 # Re-deploys of a registered app hit this and skip the (admin-gated) serve write.
 serve_path_registered() {
-  printf '%s' "$1" | grep -qE "(^|[[:space:]])${TS_PATH}[[:space:]]+proxy[[:space:]]+https?://127\.0\.0\.1:${INTERNAL_PORT}(\b|/|$)"
+  printf '%s' "$1" | grep -qE "(^|[[:space:]])${TS_PATH}[[:space:]]+proxy[[:space:]]+https?://127\.0\.0\.1:${HOST_PORT}(\b|/|$)"
 }
 
 # True when TS_PATH is served by a DIFFERENT backend (a real conflict, e.g. /calibre).

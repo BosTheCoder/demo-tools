@@ -61,7 +61,7 @@ def test_local_lib_carries_host_path_and_port():
     lib = (_render() / "infra" / "local" / "_lib.sh").read_text()
     assert 'TS_HOST="bos-desktop.fish-grouper.ts.net"' in lib
     assert 'TS_PATH="/tmp-demo"' in lib
-    assert 'INTERNAL_PORT="8000"' in lib
+    assert 'HOST_PORT="8000"' in lib
     # The reachable URL is composed from host + path.
     assert 'URL="https://${TS_HOST}${TS_PATH}"' in lib
 
@@ -70,7 +70,7 @@ def test_local_deploy_registers_tailscale_serve():
     deploy = (_render() / "infra" / "local" / "deploy.sh").read_text()
     assert "--set-path" in deploy
     assert "${TS_PATH}" in deploy
-    assert "${INTERNAL_PORT}" in deploy
+    assert "${HOST_PORT}" in deploy
     assert "up -d --build" in deploy
     # Skips the admin-gated serve write when the path is already registered
     # (so everyday re-deploys need no UAC); elevates only on first registration.
@@ -392,7 +392,7 @@ def test_scaffold_command_forwards_target_and_path(mocker):
         ["scaffold", "fastapi", "job", "--target", "local", "--tailscale-path", "/jobs"],
     )
     assert result.exit_code == 0, result.stdout
-    spy.assert_called_once_with("fastapi", "job", "demo", "local", "/jobs")
+    spy.assert_called_once_with("fastapi", "job", "demo", "local", "/jobs", None)
 
 
 def test_adopt_command_forwards_target(mocker):
@@ -400,7 +400,8 @@ def test_adopt_command_forwards_target(mocker):
     result = runner.invoke(init_app, ["adopt", "--target", "local"])
     assert result.exit_code == 0, result.stdout
     spy.assert_called_once_with(
-        "demo", stack=None, yes=False, target="local", tailscale_path=None
+        "demo", stack=None, yes=False, target="local", tailscale_path=None,
+        host_port=None,
     )
 
 

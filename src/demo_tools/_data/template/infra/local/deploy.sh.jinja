@@ -26,15 +26,15 @@ echo "==> Building + starting container (detached)"
 if serve_path_registered "$TS_STATUS"; then
   echo "==> Tailscale path ${TS_PATH} already registered — no admin needed."
 else
-  echo "==> Registering Tailscale serve: ${TS_PATH} -> 127.0.0.1:${INTERNAL_PORT}"
+  echo "==> Registering Tailscale serve: ${TS_PATH} -> 127.0.0.1:${HOST_PORT}"
   echo "    First-time registration for this app — approve the Windows UAC prompt."
   # Exact form matches the working Calibre invocation: bare port arg.
-  ts_serve_elevated --bg --set-path "${TS_PATH}" "${INTERNAL_PORT}" || true
+  ts_serve_elevated --bg --set-path "${TS_PATH}" "${HOST_PORT}" || true
   # Fresh read — we just changed the config, so the snapshot above is stale.
   if ! serve_path_registered "$(serve_status)"; then
     echo "ERROR: serve registration did not take effect (UAC declined, or no desktop session)." >&2
     echo "Run this once in an elevated Windows terminal, then re-run 'just deploy':" >&2
-    echo "  tailscale serve --bg --set-path ${TS_PATH} ${INTERNAL_PORT}" >&2
+    echo "  tailscale serve --bg --set-path ${TS_PATH} ${HOST_PORT}" >&2
     exit 1
   fi
 fi

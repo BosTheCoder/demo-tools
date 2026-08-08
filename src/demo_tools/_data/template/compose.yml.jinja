@@ -22,7 +22,10 @@ services:
   app:
     build: .
     ports:
-      - "{{ internal_port }}:{{ internal_port }}"
+      # host:container. host_port defaults to internal_port and only differs when
+      # another local app already owns that port — the local target's Tailscale
+      # serve points at the HOST side (HOST_PORT in infra/local/_lib.sh).
+      - "{{ host_port }}:{{ internal_port }}"
 {% if stateful %}    volumes:
       - app_data:/data
 {% endif %}

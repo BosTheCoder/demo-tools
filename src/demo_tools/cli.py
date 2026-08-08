@@ -11,6 +11,7 @@ def _run_scaffold(
     profile: str,
     target: str = "fly",
     tailscale_path: str | None = None,
+    host_port: int | None = None,
 ) -> None:
     from pathlib import Path
     from .scaffold import scaffold_demo
@@ -37,7 +38,7 @@ def _run_scaffold(
         raise typer.Exit(1)
     scaffold_demo(
         stack, name, dest, profile=profile,
-        deploy_target=target, tailscale_path=tailscale_path,
+        deploy_target=target, tailscale_path=tailscale_path, host_port=host_port,
     )
     typer.echo(f"Scaffolded {name} at {dest}")
     typer.echo(f"Next: cd {name} && just dev   (or 'just deploy' to ship)")
@@ -61,6 +62,7 @@ def _run_adopt(
     yes: bool = False,
     target: str = "fly",
     tailscale_path: str | None = None,
+    host_port: int | None = None,
 ) -> None:
     from pathlib import Path
     from .adopt import detect_stack, overlay_infra
@@ -111,7 +113,7 @@ def _run_adopt(
     name = repo.name
     stateful, port = _ADOPT_DEFAULTS[stack]
     overlay_infra(repo, name=name, stack=stack, stateful=stateful,
-                  internal_port=port, profile=profile,
+                  internal_port=port, host_port=host_port, profile=profile,
                   deploy_target=target, tailscale_path=tailscale_path)
     typer.echo(f"Adopted {name}: infra files added (existing files preserved).")
     typer.echo("Next: review fly.toml, then `just deploy`.")
@@ -178,6 +180,17 @@ def _target_option() -> typer.Option:
     )
 
 
+def _host_port_option() -> typer.Option:
+    return typer.Option(
+        None,
+        "--host-port",
+        help=(
+            "Host port to publish on the local target (defaults to the container "
+            "port; set it when another local app already owns that port)."
+        ),
+    )
+
+
 def _tailscale_path_option() -> typer.Option:
     return typer.Option(
         None,
@@ -193,9 +206,10 @@ def scaffold(
     profile: str = _PROFILE_OPTION,
     target: str = _target_option(),
     tailscale_path: str = _tailscale_path_option(),
+    host_port: int = _host_port_option(),
 ) -> None:
     """Explicit form: demo-init scaffold <stack> <name>."""
-    _run_scaffold(stack, name, profile, target, tailscale_path)
+    _run_scaffold(stack, name, profile, target, tailscale_path, host_port)
 
 
 @init_app.command("adopt")
@@ -207,10 +221,11 @@ def adopt(
     ),
     target: str = _target_option(),
     tailscale_path: str = _tailscale_path_option(),
+    host_port: int = _host_port_option(),
 ) -> None:
     """Overlay infra onto an existing dockerized repo in the current directory."""
     _run_adopt(profile, stack=stack, yes=yes, target=target,
-               tailscale_path=tailscale_path)
+               tailscale_path=tailscale_path, host_port=host_port)
 
 
 @demo_app.command("list")

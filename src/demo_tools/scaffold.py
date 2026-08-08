@@ -12,6 +12,7 @@ from ._resources import (
     TEMPLATE_DIR,
     TEMPLATE_GIT_URL,
     TEMPLATE_SUBDIR,
+    template_commit,
 )
 from .stacks import get_scaffolder
 from .targets import NO_DOCKERFILE_STACKS, check_target_stack, publish_mode
@@ -25,6 +26,7 @@ def scaffold_demo(
     *,
     deploy_target: str = "fly",
     tailscale_path: str | None = None,
+    host_port: int | None = None,
 ) -> None:
     """Scaffold app + overlay infra + git init + initial commit.
 
@@ -33,6 +35,9 @@ def scaffold_demo(
     so graduating between compatible targets is a flip; sets the stack can never
     use are dropped (see copier.yml's _tasks) rather than shipped dead.
     ``tailscale_path`` overrides the local URL path prefix (defaults to /<name>).
+    ``host_port`` overrides the host side of the local target's port mapping;
+    it defaults to the container port and only needs setting when another
+    local app already publishes that port.
     """
     check_target_stack(deploy_target, stack)
 
@@ -43,6 +48,7 @@ def scaffold_demo(
 
     ts_host = DEFAULT_TAILSCALE_HOST
     ts_path = tailscale_path or f"/{name}"
+    host_p = host_port or meta["internal_port"]
     derived = _target_flags(stack)
 
     run_copy(
@@ -53,6 +59,7 @@ def scaffold_demo(
             "stack": stack,
             "stateful": meta["stateful"],
             "internal_port": meta["internal_port"],
+            "host_port": host_p,
             "domain_base": DEFAULT_DOMAIN,
             "profile": profile,
             "target": deploy_target,
@@ -76,11 +83,12 @@ def scaffold_demo(
         answers_path.write_text(yaml.safe_dump({
             "_src_path": TEMPLATE_GIT_URL,
             "_subdirectory": TEMPLATE_SUBDIR,
-            "_commit": "main",
+            "_commit": template_commit(),
             "name": name,
             "stack": stack,
             "stateful": meta["stateful"],
             "internal_port": meta["internal_port"],
+            "host_port": host_p,
             "domain_base": DEFAULT_DOMAIN,
             "profile": profile,
             "target": deploy_target,

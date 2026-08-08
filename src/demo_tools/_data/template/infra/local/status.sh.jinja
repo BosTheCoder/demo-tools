@@ -7,7 +7,7 @@ resolve_ts
 if container_running; then state="running"; else state="stopped"; fi
 
 echo "Container:  ${APP}  (${state})"
-echo "Tailscale:  ${URL}  (serving -> 127.0.0.1:${INTERNAL_PORT})"
+echo "Tailscale:  ${URL}  (serving -> 127.0.0.1:${HOST_PORT})"
 echo "Data dir:   ./data  (SQLite persists here across restarts and reboots)"
 echo
 echo "docker compose ps:"

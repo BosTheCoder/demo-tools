@@ -13,6 +13,7 @@ from ._resources import (
     TEMPLATE_DIR,
     TEMPLATE_GIT_URL,
     TEMPLATE_SUBDIR,
+    template_commit,
 )
 
 
@@ -55,6 +56,7 @@ def overlay_infra(
     stack: str,
     stateful: bool,
     internal_port: int,
+    host_port: int | None = None,
     profile: str = "demo",
     deploy_target: str = "fly",
     tailscale_path: str | None = None,
@@ -91,6 +93,7 @@ def overlay_infra(
             "stack": stack,
             "stateful": stateful,
             "internal_port": internal_port,
+            "host_port": host_port or internal_port,
             "domain_base": DEFAULT_DOMAIN,
             "profile": profile,
             "target": deploy_target,
@@ -110,11 +113,12 @@ def overlay_infra(
         answers_path.write_text(yaml.safe_dump({
             "_src_path": TEMPLATE_GIT_URL,
             "_subdirectory": TEMPLATE_SUBDIR,
-            "_commit": "main",
+            "_commit": template_commit(),
             "name": name,
             "stack": stack,
             "stateful": stateful,
             "internal_port": internal_port,
+            "host_port": host_port or internal_port,
             "domain_base": DEFAULT_DOMAIN,
             "profile": profile,
             "target": deploy_target,

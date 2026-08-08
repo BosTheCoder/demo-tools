@@ -29,6 +29,11 @@ internal_port:
   help: "Port the container exposes (3000 for nextjs, 8000 for fastapi, etc.)"
   default: 3000
 
+host_port:
+  type: int
+  help: "Host port published on the local target (defaults to internal_port; set it when another app already owns that port)"
+  default: "{{ internal_port }}"
+
 domain_base:
   type: str
   help: "Subdomain base (results in <name>.<domain_base>)"
