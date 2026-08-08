@@ -68,6 +68,7 @@ secret KV:
 db-create:
     bash infra/{{TARGET}}/db-create.sh
 {% endraw %}
-# Pull latest infra improvements from the demo-tools template
+# Pull latest infra improvements from the demo-tools template. Rewrites only
+# the files stamped `MANAGED BY demo-tools`; app files are left alone.
 sync:
-    uvx copier update --answers-file .demo-template-version --trust
+    uvx --from git+https://github.com/BosTheCoder/demo-tools demo sync

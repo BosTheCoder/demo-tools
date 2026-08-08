@@ -31,7 +31,7 @@ Throwaway demos shouldn't take an afternoon to host. With `demo-tools`:
 - **Costs nothing when idle.** Machines auto-stop on no traffic; auto-start on the next request (~5s warm-up).
 - **Free TLS on a real subdomain.** `<name>.demos.buildwithbos.com` is wired up via wildcard DNS — set it up once, every future demo just works.
 - **Adoptable.** Got an existing Dockerfile? `demo-init adopt` overlays the infra without touching your app.
-- **Updatable.** `just sync` pulls template improvements into existing demos via three-way merge.
+- **Updatable.** `just sync` rewrites the infra files stamped `MANAGED BY demo-tools` from the current template and leaves everything else alone.
 
 ---
 
@@ -239,7 +239,7 @@ Each scaffolded demo ships with a `justfile` that wraps the platform calls. From
 | `just open`             | Open the demo URL in your browser                                       |
 | `just secret KEY=VAL`   | Set a Fly secret                                                        |
 | `just db-create`        | Provision managed Fly Postgres (stateful stacks only)                   |
-| `just sync`             | Pull latest template improvements via `copier update`                   |
+| `just sync`             | Rewrite the template-managed infra files (`demo sync`)                  |
 
 ---
 
@@ -347,6 +347,54 @@ Each Fly app gets its own dedicated IPs, so a single wildcard `*.demos` record c
 
 ---
 
+## Hostnames an app actually owns
+
+By default a Fly app answers on `<name>.<domain_base>` and `just deploy` wires
+that up for you. An app that owns real domains says so instead, in
+`.demo-template-version`:
+
+```yaml
+hostnames:
+  - buildwithbos.com
+  - www.buildwithbos.com
+```
+
+`just deploy` then points each of those at the app's IPs and provisions a cert
+for each, and never invents a demo hostname the app didn't ask for. `hostnames: []`
+means deploy only — no DNS, no certs.
+
+Two things a deploy will not do to DNS you set up by hand: a hostname already
+served by a CNAME is skipped rather than replaced with A/AAAA records, and an
+existing record keeps its Cloudflare proxy setting. Only brand-new records are
+created, unproxied, since Fly terminates TLS itself.
+
+The zone is the last two labels of each hostname. Set `DEMO_DNS_ZONE` when that
+guess is wrong (a `.co.uk` domain, say).
+
+---
+
+## What `just sync` will and won't rewrite
+
+`just sync` re-renders the template with the demo's own answers and overwrites
+exactly the files whose first line reads `MANAGED BY demo-tools` — everything
+under `infra/`, the GitHub Actions workflow, the compose overlays. Your
+`Dockerfile`, `fly.toml`, `compose.yml`, `justfile` and `README.md` are yours;
+sync never touches them, so hand-tuned build args and health checks survive.
+
+Files that still carry the marker but the template no longer renders (an
+`infra/` directory left behind by a target switch) are reported as orphans and
+left on disk for you to delete.
+
+`demo sync --dry-run` lists what would change without writing.
+
+> This replaced `copier update`, which did not work here. Run against a repo
+> that was `demo-init adopt`-ed rather than scaffolded, it reported "Updating
+> to template version …" and then changed nothing at all — no diff, no touched
+> files, `_commit` left on the old SHA. Copier's three-way merge has nothing to
+> anchor to when the template owns a dozen files and the app owns the rest.
+
+---
+
 ## Auto-deploy on push (GitHub Actions)
 
 Every scaffold ships a `.github/workflows/fly-deploy.yml` workflow that redeploys to Fly on every push to `main`.
@@ -400,11 +448,12 @@ Two caveats:
 - **An editable install couples your global commands to your working tree.**
   Leave the repo mid-edit in a broken state and your global `demo` /
   `demo-init` break too. `uv run` avoids this.
-- **`just sync` / `copier update` in generated demos always fetch the template
-  from GitHub** (`TEMPLATE_GIT_URL` in `_resources.py`), not your local edits.
+- **`just sync` in generated demos always fetches demo-tools from GitHub**
+  (see the `sync` recipe in the template's justfile), not your local edits.
   Initial scaffolding uses the bundled local templates, so an editable install
   lets you test *scaffolding* against local template changes — but to test the
-  *update* flow you must push to GitHub first.
+  *sync* flow you must push to GitHub first. `uv run demo sync <path>` from a
+  checkout tests it against your working tree.
 
 The Copier template lives at `src/demo_tools/_data/template/`. Stack-specific scaffolders live at `src/demo_tools/stacks/`. Tests are pytest with `subprocess.run` mocked for npx/npm calls so they're fast and offline.
 

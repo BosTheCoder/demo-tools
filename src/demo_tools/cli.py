@@ -158,7 +158,7 @@ init_app = typer.Typer(
 )
 demo_app = typer.Typer(
     no_args_is_help=True,
-    help="Manage existing demos (list, prune).",
+    help="Manage existing demos (sync, list, prune).",
 )
 
 
@@ -226,6 +226,44 @@ def adopt(
     """Overlay infra onto an existing dockerized repo in the current directory."""
     _run_adopt(profile, stack=stack, yes=yes, target=target,
                tailscale_path=tailscale_path, host_port=host_port)
+
+
+@demo_app.command("sync")
+def sync(
+    path: str = typer.Argument(".", help="Path to the demo (defaults to cwd)."),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="Show what would change without writing anything."
+    ),
+) -> None:
+    """Refresh this demo's template-managed infra files.
+
+    Only files stamped `MANAGED BY demo-tools` are rewritten. Your Dockerfile,
+    fly.toml, compose.yml, justfile and README are yours and stay untouched.
+    """
+    from pathlib import Path
+
+    from .sync import sync_demo
+
+    try:
+        changes = sync_demo(Path(path).resolve(), dry_run=dry_run)
+    except FileNotFoundError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(1) from exc
+
+    written = [c for c in changes if c.verb != "orphan"]
+    orphans = [c for c in changes if c.verb == "orphan"]
+
+    for change in written:
+        typer.echo(f"  {change.verb}  {change.path}")
+    if not written:
+        typer.echo("Already up to date.")
+    elif dry_run:
+        typer.echo(f"{len(written)} file(s) would change.")
+    else:
+        typer.echo(f"{len(written)} file(s) updated.")
+
+    for change in orphans:
+        typer.echo(f"  orphan  {change.path}  (no longer rendered; delete by hand)")
 
 
 @demo_app.command("list")

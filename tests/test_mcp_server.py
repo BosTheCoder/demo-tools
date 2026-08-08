@@ -62,7 +62,9 @@ def test_list_tools_handler_returns_all_tools():
 
     tools = anyio.run(mcp_server._list_tools)
     names = sorted(t.name for t in tools)
-    assert names == ["demo.list", "demo.prune", "demo_init.adopt", "demo_init.scaffold"]
+    assert names == [
+        "demo.list", "demo.prune", "demo.sync", "demo_init.adopt", "demo_init.scaffold",
+    ]
     for t in tools:
         assert t.inputSchema["type"] == "object"
     prune = next(t for t in tools if t.name == "demo.prune")
