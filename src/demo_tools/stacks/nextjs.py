@@ -7,7 +7,7 @@ from typing import Any
 from .. import pwa
 
 
-def scaffold(target: Path, name: str) -> dict[str, Any]:
+def scaffold(target: Path, name: str, *, pwa_assets: bool = True) -> dict[str, Any]:
     app_dir = target / "app"
     app_dir.mkdir(parents=True, exist_ok=True)
 
@@ -38,6 +38,7 @@ def scaffold(target: Path, name: str) -> dict[str, Any]:
         "export default nextConfig;\n"
     )
 
-    pwa.write_next_app_assets(app_dir, name)
+    if pwa_assets:
+        pwa.write_next_app_assets(app_dir, name)
 
     return {"stack": "nextjs", "stateful": False, "internal_port": 3000}

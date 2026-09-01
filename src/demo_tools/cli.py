@@ -12,6 +12,7 @@ def _run_scaffold(
     target: str = "fly",
     tailscale_path: str | None = None,
     host_port: int | None = None,
+    pwa_assets: bool = True,
 ) -> None:
     from pathlib import Path
     from .scaffold import scaffold_demo
@@ -39,6 +40,7 @@ def _run_scaffold(
     scaffold_demo(
         stack, name, dest, profile=profile,
         deploy_target=target, tailscale_path=tailscale_path, host_port=host_port,
+        pwa_assets=pwa_assets,
     )
     typer.echo(f"Scaffolded {name} at {dest}")
     typer.echo(f"Next: cd {name} && just dev   (or 'just deploy' to ship)")
@@ -191,6 +193,18 @@ def _host_port_option() -> typer.Option:
     )
 
 
+def _no_pwa_option() -> typer.Option:
+    return typer.Option(
+        False,
+        "--no-pwa",
+        help=(
+            "Skip the manifest, service worker and icons. For a page that is not "
+            "an app — a redirect or a one-field converter — where an offline "
+            "shell can only serve a stale copy of the thing it exists to do."
+        ),
+    )
+
+
 def _tailscale_path_option() -> typer.Option:
     return typer.Option(
         None,
@@ -207,9 +221,13 @@ def scaffold(
     target: str = _target_option(),
     tailscale_path: str = _tailscale_path_option(),
     host_port: int = _host_port_option(),
+    no_pwa: bool = _no_pwa_option(),
 ) -> None:
     """Explicit form: demo-init scaffold <stack> <name>."""
-    _run_scaffold(stack, name, profile, target, tailscale_path, host_port)
+    _run_scaffold(
+        stack, name, profile, target, tailscale_path, host_port,
+        pwa_assets=not no_pwa,
+    )
 
 
 @init_app.command("adopt")

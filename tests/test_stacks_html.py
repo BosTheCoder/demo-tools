@@ -82,3 +82,29 @@ def test_index_uses_relative_asset_paths(tmp_path):
 def test_names_the_demo_in_the_page(tmp_path):
     html_stack.scaffold(tmp_path, "chord-detector")
     assert "chord-detector" in (tmp_path / "index.html").read_text()
+
+
+# --- --no-pwa ----------------------------------------------------------------
+
+def test_no_pwa_omits_the_installable_shell(tmp_path):
+    """A page whose job is to redirect has no use for an offline shell, and a
+    worker in front of it can serve a stale copy of the very thing it bounces."""
+    from demo_tools.stacks import html as html_stack
+
+    html_stack.scaffold(tmp_path, "bouncer", pwa_assets=False)
+
+    for name in ("sw.js", "manifest.webmanifest",
+                 "icon-192.png", "icon-512.png", "icon-512-maskable.png"):
+        assert not (tmp_path / name).exists(), name
+
+    index = (tmp_path / "index.html").read_text()
+    assert "serviceWorker" not in index
+    assert "manifest" not in index
+
+
+def test_pwa_is_still_the_default(tmp_path):
+    from demo_tools.stacks import html as html_stack
+
+    html_stack.scaffold(tmp_path, "installable")
+    assert (tmp_path / "sw.js").is_file()
+    assert "serviceWorker" in (tmp_path / "index.html").read_text()

@@ -72,6 +72,12 @@ Run `demo-init` with no arguments to see the seven stacks listed below, with exa
 | `html`           | 8000      | none                       | Plain `index.html`/`app.js`/`app.css`, no build step |
 | `bare`           | any       | none                       | Empty `app/`, you (or Claude) write the Dockerfile   |
 
+**`--no-pwa`.** Every stack generates a manifest, service worker and icons, so a demo installs to a phone. Pass `--no-pwa` for a page that is not an app — a redirect, a link converter, a one-field tool — where an offline shell can only serve a stale copy of the thing the page exists to do.
+
+```bash
+demo-init scaffold html cclink --target pages --no-pwa
+```
+
 `nextjs-fastapi` deploys as two apps: `<name>-web` (public, Next.js) and `<name>-api` (`.internal` only, FastAPI). The web app gets the public hostname; the api is reachable from web at `http://<name>-api.internal:8000`.
 
 ---
@@ -183,7 +189,13 @@ Forcing `html` through a branch would mean maintaining a byte-copy of `main`, so
 
 This matters because static pages calling external services is the *normal* case for this target, not an edge case.
 
-**Custom domain.** Put the hostname in a `CNAME` file at the repo root; `just deploy` picks it up and registers it. DNS is manual: `CNAME <sub> → <user>.github.io`, **DNS-only** (grey cloud on Cloudflare — proxying breaks GitHub's certificate issuance). The certificate can take up to an hour on first setup; `just status` shows its state, which is the usual answer to "why does http work but https doesn't?".
+**Custom domain.** Put the hostname in a `CNAME` file at the repo root; `just deploy` picks it up, registers it with Pages, and — like the Fly target — upserts the DNS record for you when `CLOUDFLARE_API_TOKEN` is set. Without a token it prints the record and carries on, so the deploy still succeeds.
+
+The record it writes is `CNAME <sub> → <user>.github.io`, **forced DNS-only**. This is the one place the Pages DNS script is stricter than the Fly one, which leaves an existing proxy setting alone: proxying breaks GitHub's certificate issuance, and the symptom shows up an hour later as "http works, https doesn't", nowhere near the deploy that caused it. A record demo-tools owns is a record that stays grey-clouded. An apex domain is refused rather than mangled — Pages needs A records there, and CNAME flattening would hand it a host it has no certificate for.
+
+The certificate can take up to an hour on first setup; `just status` shows its state.
+
+**`.nojekyll`.** The root publish path commits one on first deploy. Without it GitHub runs the repo through Jekyll, which hides `_`-prefixed files and directories — a silent 404 for anything named that way. (The branch path writes one into its build output instead, since there the output is the artifact.)
 
 
 | `just <verb>` | Fly | `local` |

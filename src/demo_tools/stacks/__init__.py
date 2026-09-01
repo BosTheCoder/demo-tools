@@ -6,7 +6,9 @@ from typing import Any, Protocol, cast
 
 
 class StackScaffolder(Protocol):
-    def scaffold(self, target: Path, name: str) -> dict[str, Any]: ...
+    def scaffold(
+        self, target: Path, name: str, *, pwa_assets: bool = True
+    ) -> dict[str, Any]: ...
 
 
 _MODULE_NAMES = {

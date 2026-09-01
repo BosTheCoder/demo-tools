@@ -37,17 +37,19 @@ _INDEX = """<!doctype html>
   <p id="out" aria-live="polite"></p>
 </main>
 <script type="module" src="app.js"></script>
-<script>
+{sw_script}</body>
+</html>
+"""
+
+_SW_SCRIPT = """<script>
   // Non-fatal by design: without the worker the app still runs, it just loses
   // its offline fallback.
-  if ("serviceWorker" in navigator) {{
-    window.addEventListener("load", function () {{
-      navigator.serviceWorker.register("sw.js").catch(function () {{}});
-    }});
-  }}
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", function () {
+      navigator.serviceWorker.register("sw.js").catch(function () {});
+    });
+  }
 </script>
-</body>
-</html>
 """
 
 _APP_JS = """// No bundler: this is an ES module the browser loads directly.
@@ -85,17 +87,24 @@ button:active { opacity: .85; }
 """
 
 
-def scaffold(target: Path, name: str) -> dict[str, Any]:
+def scaffold(target: Path, name: str, *, pwa_assets: bool = True) -> dict[str, Any]:
     target.mkdir(parents=True, exist_ok=True)
 
     # Every path is relative, because this stack is served from two places: the
     # custom domain root (https://site/) and, before a domain is attached,
     # https://<user>.github.io/<repo>/. Absolute "/manifest.webmanifest" 404s in
     # the second case, and an absolute scope makes the browser refuse to install.
-    pwa.write_assets(target, name, scope="./")
+    # A page whose whole job is to redirect, or to render one field, has no
+    # use for an installable shell — and a service worker in front of it can
+    # serve a stale copy of the very thing it exists to bounce. --no-pwa is
+    # for those.
+    if pwa_assets:
+        pwa.write_assets(target, name, scope="./")
 
     (target / "index.html").write_text(
-        _INDEX.format(name=name, head_tags=pwa.head_tags(".")), encoding="utf-8"
+        _INDEX.format(name=name, head_tags=pwa.head_tags(".") if pwa_assets else "",
+                      sw_script=_SW_SCRIPT if pwa_assets else ""),
+        encoding="utf-8",
     )
     (target / "app.js").write_text(_APP_JS, encoding="utf-8")
     (target / "app.css").write_text(_APP_CSS % {"accent": pwa.hex_accent(name)}, encoding="utf-8")

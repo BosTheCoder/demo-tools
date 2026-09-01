@@ -13,6 +13,16 @@ if [[ -n "$(git status --porcelain)" ]]; then
 fi
 
 if [[ "$PUBLISH_MODE" == "root" ]]; then
+  # Stop GitHub running the repo through Jekyll, which drops _-prefixed files
+  # and directories. The branch path writes this into the build output; the
+  # root path has to commit it, because here the repo *is* the artifact.
+  if [[ ! -f .nojekyll ]]; then
+    echo "==> Adding .nojekyll (Jekyll would hide _-prefixed files)"
+    touch .nojekyll
+    git add .nojekyll
+    git commit -q -m "chore: .nojekyll — serve files as written" .nojekyll
+  fi
+
   # No build step: the repo root IS the site. Push and point Pages at it.
   echo "==> Pushing ${BRANCH} (no build step — source is the artifact)"
   git push -u origin "$BRANCH"
@@ -66,7 +76,8 @@ if [[ -f CNAME ]]; then
   CUSTOM="$(tr -d '[:space:]' < CNAME)"
   echo "==> Custom domain: ${CUSTOM}"
   gh api -X PUT "repos/${SLUG}/pages" -f "cname=${CUSTOM}" >/dev/null 2>&1 || true
-  echo "    DNS must be: CNAME ${CUSTOM%%.*} -> $(echo "$SLUG" | cut -d/ -f1 | tr 'A-Z' 'a-z').github.io  (DNS-only, not proxied)"
+  bash "$HERE/cloudflare_dns.sh" "$CUSTOM" \
+       "$(echo "$SLUG" | cut -d/ -f1 | tr 'A-Z' 'a-z').github.io"
 fi
 
 echo

@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Any
 
 
-def scaffold(target: Path, name: str) -> dict[str, Any]:
+def scaffold(target: Path, name: str, *, pwa_assets: bool = True) -> dict[str, Any]:
     """Create an empty app/ directory. Claude fills in the actual app code."""
     app_dir = target / "app"
     app_dir.mkdir(parents=True, exist_ok=True)

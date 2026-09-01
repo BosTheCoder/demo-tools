@@ -27,6 +27,7 @@ def scaffold_demo(
     deploy_target: str = "fly",
     tailscale_path: str | None = None,
     host_port: int | None = None,
+    pwa_assets: bool = True,
 ) -> None:
     """Scaffold app + overlay infra + git init + initial commit.
 
@@ -38,13 +39,17 @@ def scaffold_demo(
     ``host_port`` overrides the host side of the local target's port mapping;
     it defaults to the container port and only needs setting when another
     local app already publishes that port.
+    ``pwa_assets`` generates the manifest, service worker and icons that make a
+    demo installable. Pass False for a page that is not an app — a redirect or
+    a single-field converter, where an offline shell can only serve a stale
+    copy of the thing the page exists to do.
     """
     check_target_stack(deploy_target, stack)
 
     target.mkdir(parents=True, exist_ok=True)
 
     scaffolder = get_scaffolder(stack)
-    meta = scaffolder.scaffold(target, name)
+    meta = scaffolder.scaffold(target, name, pwa_assets=pwa_assets)
 
     ts_host = DEFAULT_TAILSCALE_HOST
     ts_path = tailscale_path or f"/{name}"

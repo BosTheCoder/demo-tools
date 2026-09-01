@@ -171,3 +171,52 @@ def test_justfile_dispatches_every_verb_to_the_target():
     just = (_render("html") / "justfile").read_text()
     for verb in ("deploy", "stop", "start", "destroy", "logs", "ssh", "status", "open"):
         assert f"infra/{{{{TARGET}}}}/{verb}.sh" in just, verb
+
+
+# --- .nojekyll and DNS, added after cclink deployed without either ------------
+
+@pytest.mark.parametrize("stack", ["html", "vite", "bare"])
+def test_dns_script_renders_and_is_managed(stack):
+    """Managed, because that is the only way `just sync` reaches an existing
+    demo. A helper the template renders but does not mark is a helper nobody
+    already deployed will ever receive."""
+    script = _render(stack) / "infra" / "pages" / "cloudflare_dns.sh"
+    assert script.is_file()
+    assert "MANAGED BY demo-tools" in script.read_text()
+
+
+def test_deploy_applies_dns_rather_than_only_printing_it():
+    deploy = (_render("html") / "infra" / "pages" / "deploy.sh").read_text()
+    assert "cloudflare_dns.sh" in deploy
+
+
+def test_dns_refuses_the_zone_apex():
+    """A CNAME cannot sit at the apex beside SOA/NS, and Cloudflare's flattening
+    would hand Pages a host it has no certificate for."""
+    script = _render("html") / "infra" / "pages" / "cloudflare_dns.sh"
+    r = subprocess.run(["bash", str(script), "example.com", "user.github.io"],
+                       capture_output=True, text=True, env={"PATH": "/usr/bin:/bin"})
+    assert r.returncode == 0
+    assert "apex" in r.stdout.lower()
+    assert "185.199" in r.stdout
+
+
+def test_dns_without_a_token_prints_the_record_and_succeeds():
+    """A missing token must not fail the deploy — it degrades to the manual
+    instruction the target shipped with before this existed."""
+    script = _render("html") / "infra" / "pages" / "cloudflare_dns.sh"
+    r = subprocess.run(["bash", str(script), "cc.example.com", "user.github.io"],
+                       capture_output=True, text=True, env={"PATH": "/usr/bin:/bin"})
+    assert r.returncode == 0
+    assert "CNAME cc -> user.github.io" in r.stdout
+    assert "grey cloud" in r.stdout
+
+
+def test_root_publish_commits_a_nojekyll():
+    """Without it GitHub runs the repo through Jekyll, which hides _-prefixed
+    files. The branch path writes one into its build output; the root path has
+    to commit one, because there the repo is the artifact."""
+    deploy = (_render("html") / "infra" / "pages" / "deploy.sh").read_text()
+    root_half = deploy.split('PUBLISH_MODE" == "root"')[1].split("else")[0]
+    assert ".nojekyll" in root_half
+    assert "git commit" in root_half

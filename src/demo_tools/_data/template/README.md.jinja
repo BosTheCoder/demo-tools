@@ -4,6 +4,20 @@ Demo deployed via [demo-tools](https://github.com/BosTheCoder/demo-tools).
 
 - **Stack:** {{ stack }}
 - **Deploy target:** {{ target }}
+{% if target == "pages" -%}
+{% if publish_mode == "root" -%}
+- **Local dev:** `just dev` — serves these files on http://localhost:{{ internal_port }}. No build step and no container: what you edit is what ships.
+{% else -%}
+- **Local dev:** `just dev` — serves the built output. `just build` first, or run your bundler's own dev server for hot reload.
+{% endif -%}
+- **Deploy:** `just deploy` — {% if publish_mode == "root" %}pushes `main`; Pages serves the repo root{% else %}builds, then pushes `dist/` to `gh-pages`{% endif %}. Then it registers the Pages config, the `CNAME`, and the DNS record.
+- **Live URL:**
+  - https://{{ name }}.github.io (until a custom domain is attached)
+  - Put a hostname in a `CNAME` file at the repo root and `just deploy` points it at Pages. DNS-only — a proxied record breaks GitHub's certificate issuance.
+- **First deploy?** The HTTPS certificate can take up to an hour. `just status` shows its state, which is the usual answer to "why does http work but https doesn't?".
+- **No server here.** `just secret` deliberately fails: anything this page can read, a visitor can read. Public config belongs in the source; a real credential needs `DEMO_TARGET=fly just deploy`.
+- **Status / logs / destroy:** `just status` / `just logs` (Pages build history) / `just destroy` (disables Pages, leaves the repo).
+{% else -%}
 {% if stack in ["fastapi", "streamlit"] -%}
 - **Local dev:** `just dev` — hot reload via `compose.dev.yml` (your `app/` is bind-mounted, so edits apply without a rebuild; changing `requirements.txt` still needs `just build`).
 {% else -%}
@@ -26,4 +40,5 @@ Demo deployed via [demo-tools](https://github.com/BosTheCoder/demo-tools).
   domains for an app that owns them, or `[]` to deploy without touching DNS.
 {% endif -%}
 - **Stop / start / destroy:** `just stop` / `just start` / `just destroy`
+{% endif -%}
 - **Update infra files:** `just sync`

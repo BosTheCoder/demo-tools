@@ -9,7 +9,7 @@ from .._resources import STARTERS_DIR
 STARTER = STARTERS_DIR / "streamlit"
 
 
-def scaffold(target: Path, name: str) -> dict[str, Any]:
+def scaffold(target: Path, name: str, *, pwa_assets: bool = True) -> dict[str, Any]:
     app_dir = target / "app"
     shutil.copytree(STARTER, app_dir)
     return {"stack": "streamlit", "stateful": True, "internal_port": 8501}

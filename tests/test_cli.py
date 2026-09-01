@@ -53,7 +53,7 @@ def test_init_explicit_scaffold_form_still_works(mocker):
     spy = mocker.patch("demo_tools.cli._run_scaffold")
     result = runner.invoke(init_app, ["scaffold", "nextjs", "my-demo"])
     assert result.exit_code == 0, result.stdout
-    spy.assert_called_once_with("nextjs", "my-demo", "demo", "fly", None, None)
+    spy.assert_called_once_with("nextjs", "my-demo", "demo", "fly", None, None, pwa_assets=True)
 
 
 def test_scaffold_command_forwards_profile_default(mocker):
@@ -61,7 +61,7 @@ def test_scaffold_command_forwards_profile_default(mocker):
     spy = mocker.patch("demo_tools.cli._run_scaffold")
     result = runner.invoke(init_app, ["scaffold", "nextjs", "my-app"])
     assert result.exit_code == 0, result.stdout
-    spy.assert_called_once_with("nextjs", "my-app", "demo", "fly", None, None)
+    spy.assert_called_once_with("nextjs", "my-app", "demo", "fly", None, None, pwa_assets=True)
 
 
 def test_scaffold_command_forwards_profile_service(mocker):
@@ -69,7 +69,7 @@ def test_scaffold_command_forwards_profile_service(mocker):
     spy = mocker.patch("demo_tools.cli._run_scaffold")
     result = runner.invoke(init_app, ["scaffold", "nextjs", "my-app", "--profile", "service"])
     assert result.exit_code == 0, result.stdout
-    spy.assert_called_once_with("nextjs", "my-app", "service", "fly", None, None)
+    spy.assert_called_once_with("nextjs", "my-app", "service", "fly", None, None, pwa_assets=True)
 
 
 def test_adopt_command_forwards_profile_default(mocker):
@@ -241,3 +241,11 @@ def test_prune_finds_nextjs_fastapi_pair_via_the_web_app(mocker):
         if c.args and c.args[0][:3] == ["fly", "apps", "destroy"]
     ]
     assert destroyed == ["chord-web", "chord-api"]
+
+
+def test_no_pwa_reaches_the_scaffolder(mocker):
+    spy = mocker.patch("demo_tools.cli._run_scaffold")
+    result = runner.invoke(init_app, ["scaffold", "html", "bouncer",
+                                      "--target", "pages", "--no-pwa"])
+    assert result.exit_code == 0, result.stdout
+    assert spy.call_args.kwargs["pwa_assets"] is False

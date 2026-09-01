@@ -392,7 +392,7 @@ def test_scaffold_command_forwards_target_and_path(mocker):
         ["scaffold", "fastapi", "job", "--target", "local", "--tailscale-path", "/jobs"],
     )
     assert result.exit_code == 0, result.stdout
-    spy.assert_called_once_with("fastapi", "job", "demo", "local", "/jobs", None)
+    spy.assert_called_once_with("fastapi", "job", "demo", "local", "/jobs", None, pwa_assets=True)
 
 
 def test_adopt_command_forwards_target(mocker):
