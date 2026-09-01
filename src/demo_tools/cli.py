@@ -118,7 +118,12 @@ def _run_adopt(
                   internal_port=port, host_port=host_port, profile=profile,
                   deploy_target=target, tailscale_path=tailscale_path)
     typer.echo(f"Adopted {name}: infra files added (existing files preserved).")
-    typer.echo("Next: review fly.toml, then `just deploy`.")
+    # A pages project has no fly.toml to review; it needs a CNAME file if it
+    # is going to answer on a custom domain.
+    if target == "pages":
+        typer.echo("Next: put your hostname in a CNAME file, then `just deploy`.")
+    else:
+        typer.echo("Next: review fly.toml, then `just deploy`.")
 
 
 def _prompt_stack() -> str:
